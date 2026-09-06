@@ -10,10 +10,19 @@ npm start                                          # dev
 npm run dev                                        # dev + devtools protocol on :9222
 open dist/CanvasLide-darwin-arm64/CanvasLide.app   # the packaged app
 npm run package                                    # rebuild the .app after changes
+npm run install-app                                # rebuild and copy it into /Applications
+npm test                                           # markdown + JSON Canvas round-trip tests
 ```
 
 Your data lives in **~/Documents/CanvasLide** — one `.canvaslide.json` file per
-page, plus `assets/` for images. Plain files you own.
+page, plus `assets/` for images. Plain files you own. Writes are atomic (temp
+file + rename), the last edit is flushed synchronously when the window closes,
+and deleting a page moves it to `.trash/` inside the vault (*Empty Trash* is in
+the File menu and the palette).
+
+The vault is watched. If a sync client or another app changes a file, the
+sidebar updates and an open page reloads in place; if you also had unsaved
+edits on that page, yours are kept as a `(conflict …)` copy so nothing is lost.
 
 *File → Change Vault Folder* points it somewhere else, and the choice is
 remembered. Point it at an iCloud Drive, Dropbox or Syncthing folder and every
@@ -89,7 +98,8 @@ centre cell means "float".
 | Connector | `A` | Arrow between blocks — or drag a block's side dot |
 | Comment | `C` | Pin + threaded replies, sticks to the block it's on |
 | Page embed | `/` | A live card mirroring another page's contents |
-| Image | — | Paste or drop; copied into the vault |
+| Image | — | Paste or drop; copied into `assets/` and stored vault-relative |
+| Link | — | Paste a URL, or right-click → Link…; opens in your browser |
 
 ## Getting around
 
@@ -108,7 +118,10 @@ centre cell means "float".
   from the same spot moves it instead.
 - `⌘⇧P` command palette · `⌘K` quick switcher · `/` insert a block
 - `⌘G` graph · `⌘⇧O` outline · `⌘\` sidebar · `⌘⇧D` today's daily note
-- `⌘Z` undo · `⌘D` duplicate · `⇧⌘G` wrap in a section
+- `⌘Z` undo · `⌘D` duplicate · `⇧⌘G` wrap in a section · right-click for a
+  context menu on blocks, arrows, empty canvas and sidebar pages
+- Duplicate copies the arrows between the copied blocks and their comments.
+  Renaming a page rewrites every `[[link]]` to it across the vault.
 
 ## Drafting look
 
@@ -165,7 +178,8 @@ becomes a label override; clear it to go back to the measured value.
 Sections are the unit of output — each one is its own drawing:
 
 - **Section → PDF** (`⌘P`, or the button in the inspector when a section is selected)
-- **All sections → PDF** — one page per section, in reading order: a drawing set
+- **All sections → PDF** — one page per section, in reading order, each at its
+  own sheet size: a drawing set
 - **Whole page → PDF** (`⌥⌘P`)
 
 Page size comes from the section's size on the canvas (canvas px at 96dpi →
@@ -187,7 +201,6 @@ private key alongside the spec fields. There's also *Export as Markdown*.
 
 ```
 main.js              Electron main: window, menu, vault + file I/O over IPC
-pdf.js               minimal dependency-free PDF writer (JPEG → pages)
 preload.js           the whitelisted `window.api` bridge
 renderer/
   index.html         DOM skeleton — sidebar / stage / toolbar / overlays
@@ -209,7 +222,8 @@ renderer/
   js/inspector.js    selection panel + pen options
   js/graph.js        force-directed vault graph
   js/panels.js       minimap + outline
-  js/app.js          bootstrap: editing, keyboard, paste, chrome
+  js/app.js          bootstrap: editing, keyboard, paste, chrome, context menu
+test/                node --test suites for markdown.js and jsoncanvas.js (jsdom)
 ```
 
 Mutations go `store.beginChange()` → mutate → `store.commit()`; that's what makes
@@ -221,12 +235,8 @@ and a line in `commands.js:build`.
 
 Real-time collaboration, nested sections, and mobile.
 
-PDF and PNG export rasterise: the app frames each section in the window and
-captures it, so output resolution is bounded by the window size (retina gives
-2x, and we cap magnification at 2x, so a small section exports at up to ~4x its
-canvas size). Text in a PDF is therefore an image, not selectable type. Vector
-PDF output would mean re-rendering the canvas as PDF drawing operators rather
-than capturing it — worth doing if you want true CAD output.
+PDF output is vector: text stays text and strokes stay paths. PNG export is a
+screen capture of the fitted page, so its resolution is bounded by the window.
 
 Dimensions measure straight distances only — no angular, radial or chained
 dimensions yet.

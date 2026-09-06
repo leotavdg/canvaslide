@@ -4,6 +4,7 @@
    card realistically holds. [[wikilinks]] are first-class. */
 App.md = (() => {
   const esc = App.util.esc;
+  const NBSP = / /g;
 
   /* ── rendered HTML → markdown ────────────────────────────────────────────
      The inverse of render(), for exactly the constructs render() emits. It
@@ -13,17 +14,19 @@ App.md = (() => {
   function toMarkdown(root) {
     const lines = [];
 
-    const inlineOf = (node) => {
+    // `unwrapStrike` is set for a finished task: render() draws it struck
+    // through, and that strike must not come back as ~~…~~ in the source.
+    const inlineOf = (node, unwrapStrike = false) => {
       let out = '';
       for (const n of node.childNodes) {
-        if (n.nodeType === 3) { out += n.nodeValue.replace(/\u00a0/g, ' '); continue; }
+        if (n.nodeType === 3) { out += n.nodeValue.replace(NBSP, ' '); continue; }
         if (n.nodeType !== 1) continue;
         const tag = n.tagName.toLowerCase();
-        const kids = () => inlineOf(n);
+        const kids = () => inlineOf(n, false);
         if (tag === 'br') out += '\n';
         else if (tag === 'strong' || tag === 'b') out += `**${kids()}**`;
         else if (tag === 'em' || tag === 'i') out += `*${kids()}*`;
-        else if (tag === 's' || tag === 'del') out += `~~${kids()}~~`;
+        else if (tag === 's' || tag === 'del') out += unwrapStrike ? inlineOf(n, true) : `~~${kids()}~~`;
         else if (tag === 'mark') out += `==${kids()}==`;
         else if (tag === 'code') out += '`' + n.textContent + '`';
         else if (tag === 'a') out += `[${kids()}](${n.getAttribute('href') || ''})`;
@@ -33,7 +36,7 @@ App.md = (() => {
           out += shown && shown !== page ? `[[${page}|${shown}]]` : `[[${page}]]`;
         } else if (n.classList.contains('tag-inline')) out += n.textContent;
         else if (n.classList.contains('md-check')) out += '';       // handled by the li
-        else out += kids();
+        else out += inlineOf(n, unwrapStrike);
       }
       return out;
     };
@@ -62,14 +65,15 @@ App.md = (() => {
         rows.forEach((tr, i) => {
           const cells = [...tr.children].map(td => inlineOf(td).trim());
           lines.push(`| ${cells.join(' | ')} |`);
-          if (i === 0) lines.push(`|${cells.map(() => '---').join('|')}|`);
+          if (i === 0) lines.push(`| ${cells.map(() => '---').join(' | ')} |`);
         });
         lines.push('');
       } else if (tag === 'ul' || tag === 'ol') {
         [...el.children].forEach((li, i) => {
           const check = li.querySelector('.md-check');
-          const text = inlineOf(li).trim();
-          if (check) lines.push(`- [${check.textContent.trim() === '☑' ? 'x' : ' '}] ${text}`);
+          const done = !!check && check.textContent.trim() === '☑';
+          const text = inlineOf(li, done).trim();
+          if (check) lines.push(`- [${done ? 'x' : ' '}] ${text}`);
           else lines.push(tag === 'ol' ? `${i + 1}. ${text}` : `- ${text}`);
         });
         lines.push('');
@@ -80,7 +84,7 @@ App.md = (() => {
       } else {
         // <p>, and the <div>s contenteditable makes when you press Enter
         const t = inlineOf(el);
-        lines.push(t.trim() ? t : '');
+        if (t.trim()) lines.push(t, ''); else lines.push('');
       }
     };
 
@@ -88,25 +92,31 @@ App.md = (() => {
     return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
   }
 
+  /* Inline formatting. Code spans and [[wikilinks]] are lifted out first and
+     put back last, so their contents are never escaped twice or formatted:
+     [[Tom & Jerry]] must look up the page "Tom & Jerry", not "Tom &amp; Jerry". */
+  const HOLE = '\u0000';
   function inline(s) {
-    s = esc(s);
-    s = s.replace(/`([^`]+)`/g, (_m, c) => `<code>${c}</code>`);
-    // [[Page]] and [[Page|alias]]
-    s = s.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (_m, page, alias) => {
+    const holes = [];
+    const hole = (html) => { holes.push(html); return `${HOLE}${holes.length - 1}${HOLE}`; };
+    let t = String(s ?? '').replace(/\u0000/g, '');
+    t = t.replace(/`([^`\n]+)`/g, (_m, c) => hole(`<code>${esc(c)}</code>`));
+    t = t.replace(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g, (_m, page, alias) => {
       const name = page.trim();
       const known = App.store.pageExists(name);
-      return `<span class="wikilink${known ? '' : ' missing'}" data-link="${esc(name)}">${esc(alias || name)}</span>`;
+      return hole(`<span class="wikilink${known ? '' : ' missing'}" data-link="${esc(name)}">${esc((alias || name).trim())}</span>`);
     });
-    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-    s = s.replace(/(^|\W)\*([^*\n]+)\*/g, '$1<em>$2</em>');
-    s = s.replace(/(^|\W)_([^_\n]+)_/g, '$1<em>$2</em>');
-    s = s.replace(/~~([^~]+)~~/g, '<s>$1</s>');
-    s = s.replace(/==([^=]+)==/g, '<mark>$1</mark>');
-    s = s.replace(/\[([^\]]+)\]\((https?:[^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    t = esc(t);
+    t = t.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    t = t.replace(/(^|\W)\*([^*\n]+)\*(?!\w)/g, '$1<em>$2</em>');
+    t = t.replace(/(^|\W)_([^_\n]+)_(?!\w)/g, '$1<em>$2</em>');
+    t = t.replace(/~~([^~]+)~~/g, '<s>$1</s>');
+    t = t.replace(/==([^=]+)==/g, '<mark>$1</mark>');
+    t = t.replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
     // #tags become clickable chips
-    s = s.replace(/(^|[\s(])#([a-z0-9][\w/-]{0,40})/gi,
+    t = t.replace(/(^|[\s(])#([a-z0-9][\w/-]{0,40})/gi,
       (_m, pre, tag) => `${pre}<span class="tag-inline" data-tag="${esc(tag.toLowerCase())}">#${esc(tag)}</span>`);
-    return s;
+    return t.replace(/\u0000(\d+)\u0000/g, (_m, i) => holes[+i]);
   }
 
   function render(src) {
@@ -190,7 +200,7 @@ App.md = (() => {
   /** Every [[link]] target inside a string. */
   function links(src) {
     const found = [];
-    const re = /\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g;
+    const re = /\[\[([^\]|\n]+)(?:\|[^\]\n]+)?\]\]/g;
     let m;
     while ((m = re.exec(String(src || '')))) found.push(m[1].trim());
     return found;

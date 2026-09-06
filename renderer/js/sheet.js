@@ -127,7 +127,7 @@ App.sheet = (() => {
       store().beginChange('label size');
       for (const n of d.nodes) {
         if (n.type === 'shape' && n.text) n.fs = +all.value;
-        else if (['dim', 'group', 'note', 'todo', 'table'].includes(n.type)) n.fs = +all.value;
+        else if (['dim', 'group', 'note', 'todo', 'table', 'sticky'].includes(n.type)) n.fs = +all.value;
         else continue;
         const el2 = document.querySelector(`[data-id="${n.id}"]`);
         if (el2) el2._key = null;

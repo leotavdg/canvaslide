@@ -1,12 +1,13 @@
 'use strict';
 /* ===========================================================================
-   app.js — bootstrap + the glue: inline editing, keyboard, paste, chrome.
+   app.js — bootstrap + the glue: inline editing, keyboard, paste, chrome,
+   the context menu.
    =========================================================================== */
 App.app = (() => {
   const U = App.util;
   const store = App.store;
   const NODES = App.nodes;
-  const NBSP = /\u00a0/g;
+  const NBSP = / /g;
 
   let titleEl, saveEl, layerNodes;
 
@@ -19,6 +20,8 @@ App.app = (() => {
     const a = document.activeElement;
     return !!a && (a.isContentEditable || a.tagName === 'INPUT' || a.tagName === 'TEXTAREA');
   };
+
+  const URL_RE = /^(https?:\/\/[^\s]+)$/i;
 
   // ── toast ───────────────────────────────────────────────────────────────
   let toastTimer = null;
@@ -126,17 +129,24 @@ App.app = (() => {
     }
   }
 
+  // The undo snapshot for an edit is taken at the first keystroke, not when the
+  // field is focused — clicking around a table must not fill the undo stack.
+  let editSession = null;
+
   function wireEditing() {
     layerNodes.addEventListener('focusin', (e) => {
-      if (!fieldInfo(e.target)) return;
-      store.beginChange('edit');
+      const info = fieldInfo(e.target);
+      if (!info) return;
+      editSession = { nodeId: info.node.id, began: false };
     });
 
     layerNodes.addEventListener('input', (e) => {
       const info = fieldInfo(e.target);
       if (!info) return;
+      if (!editSession || editSession.nodeId !== info.node.id) editSession = { nodeId: info.node.id, began: false };
+      if (!editSession.began) { store.beginChange('edit'); editSession.began = true; }
       readBack(info.node, info.holder, info.field);
-      const el = layerNodes.querySelector(`[data-id="${info.node.id}"]`);
+      const el = NODES.elOf(info.node.id);
       if (el) el._key = NODES.contentKey(info.node);   // keep the DOM patcher in sync
       store.touch();
       markDirty();
@@ -147,16 +157,21 @@ App.app = (() => {
     layerNodes.addEventListener('focusout', (e) => {
       const info = fieldInfo(e.target);
       if (!info) return;
+      const began = editSession && editSession.nodeId === info.node.id && editSession.began;
+      editSession = null;
       App.suggest.hide();
       App.slash.hide();
       if (info.field === 'dimtext') {
-        store.beginChange('dimension');
-        App.cad.applyDimText(info.node, info.holder.innerText.replace(NBSP, ' '));
-        info.nodeEl._key = null;
-        store.commit({ full: true });
+        const text = info.holder.innerText.replace(NBSP, ' ');
+        if (text.trim() !== (info.node.label || App.cad.measure(App.cad.dimGeometry(info.node).len))) {
+          store.beginChange('dimension');
+          App.cad.applyDimText(info.node, text);
+          info.nodeEl._key = null;
+          store.commit({ full: true });
+        }
       } else if (info.field === 'body' && info.holder.classList.contains('editing')) {
-        NODES.endBodyEdit(info.node, info.nodeEl);
-      } else {
+        NODES.endBodyEdit(info.node, info.nodeEl, began);
+      } else if (began) {
         info.nodeEl._key = null;
         store.commit({ full: true });
       }
@@ -276,7 +291,7 @@ App.app = (() => {
     store.beginChange('items');
     const item = { id: U.uid('i'), text: '', done: false };
     node.items.splice(afterIdx + 1, 0, item);
-    const el = layerNodes.querySelector(`[data-id="${node.id}"]`);
+    const el = NODES.elOf(node.id);
     if (el) el._key = null;
     const needed = 52 + node.items.length * 24;
     if (needed > node.h) node.h = needed;
@@ -297,7 +312,7 @@ App.app = (() => {
 
   function focusItem(nodeId, idx) {
     requestAnimationFrame(() => {
-      const el = layerNodes.querySelector(`[data-id="${nodeId}"]`);
+      const el = NODES.elOf(nodeId);
       if (!el) return;
       const rows = el.querySelectorAll('.t-text');
       caretTo(rows[U.clamp(idx, 0, rows.length - 1)]);
@@ -321,7 +336,7 @@ App.app = (() => {
 
     store.beginChange('promote');
     node.body = `See [[${name}]]`;
-    const el = layerNodes.querySelector(`[data-id="${node.id}"]`);
+    const el = NODES.elOf(node.id);
     if (el) el._key = null;
     store.commit({ full: true });
     toast(`Created page “${name}”`);
@@ -347,6 +362,12 @@ App.app = (() => {
     if (c) c.run();
   };
 
+  /** ⌘Z from the menu: native text undo while typing, document undo otherwise. */
+  function undoFromMenu(redo) {
+    if (isTyping()) { document.execCommand(redo ? 'redo' : 'undo'); return; }
+    redo ? store.redo() : store.undo();
+  }
+
   function wireKeys() {
     window.addEventListener('keydown', (e) => {
       const meta = e.metaKey || e.ctrlKey;
@@ -356,6 +377,7 @@ App.app = (() => {
       if (App.slash.onKeyDown(e)) return;
 
       if (e.key === 'Escape') {
+        if (App.ctx.isOpen()) return App.ctx.hide();
         if (App.canvas.cancelPending()) return;
         if (App.commands.isOpen()) return App.commands.close();
         if (App.graph.isOpen()) return App.graph.close();
@@ -401,7 +423,8 @@ App.app = (() => {
       if (e.key.startsWith('Arrow') && store.state.selection.size) {
         e.preventDefault();
         const step = e.shiftKey ? 24 : 8;
-        store.beginChange('nudge');
+        // a held key is one move, not one undo entry per repeat
+        store.beginChange('nudge', { coalesce: 600 });
         for (const n of App.groups.withChildren([...store.state.selection])) {
           if (e.key === 'ArrowLeft') n.x -= step;
           if (e.key === 'ArrowRight') n.x += step;
@@ -450,6 +473,23 @@ App.app = (() => {
     return true;
   }
 
+  /** Text arriving from the clipboard or a drop, placed with its top-left at `at`. */
+  function insertFromText(text, at) {
+    const t = String(text || '').trim();
+    if (!t) return null;
+    if (URL_RE.test(t)) {
+      let title = '';
+      try { title = new URL(t).hostname.replace(/^www\./, ''); } catch (_) {}
+      return store.addNode(NODES.create('link', at.x, at.y, { url: t, title }));
+    }
+    if (stickiesFromText(t, at)) return null;
+    const lines = t.split('\n');
+    return store.addNode(NODES.create('note', at.x, at.y, {
+      title: lines[0].slice(0, 60),
+      body: lines.slice(1).join('\n'),
+    }));
+  }
+
   async function imageNodeFrom(file, at) {
     const dataUrl = await new Promise(res => {
       const fr = new FileReader();
@@ -457,16 +497,18 @@ App.app = (() => {
       fr.readAsDataURL(file);
     });
     const rel = await window.api.saveAsset({ name: file.name || 'pasted.png', dataUrl });
+    if (!rel) { toast('That file is not an image'); return null; }
     return new Promise(res => {
       const probe = new Image();
-      probe.onload = () => {
-        const scale = Math.min(1, 420 / probe.width);
+      const place = (w, h) => {
+        const scale = Math.min(1, 420 / w);
         res(store.addNode(NODES.create('image', at.x, at.y, {
-          src: `file://${store.state.vaultPath}/${rel}`,
-          w: Math.round(probe.width * scale),
-          h: Math.round(probe.height * scale),
+          src: rel,                                    // vault-relative, so the vault can move
+          w: Math.round(w * scale), h: Math.round(h * scale),
         })));
       };
+      probe.onload = () => place(probe.width || 260, probe.height || 180);
+      probe.onerror = () => place(260, 180);
       probe.src = dataUrl;
     });
   }
@@ -487,13 +529,7 @@ App.app = (() => {
       const text = e.clipboardData ? e.clipboardData.getData('text/plain') : '';
       if (!text || !text.trim()) return;
       e.preventDefault();
-
-      if (stickiesFromText(text, { x: centre.x - 200, y: centre.y - 120 })) return;
-      const lines = text.split('\n');
-      store.addNode(NODES.create('note', centre.x - 160, centre.y - 100, {
-        title: lines[0].slice(0, 60),
-        body: lines.slice(1).join('\n'),
-      }));
+      insertFromText(text, { x: centre.x - 160, y: centre.y - 100 });
     });
 
     window.addEventListener('dragover', (e) => e.preventDefault());
@@ -503,14 +539,169 @@ App.app = (() => {
       const rect = App.canvas.viewportEl.getBoundingClientRect();
       let w = App.canvas.toWorld({ x: e.clientX - rect.left, y: e.clientY - rect.top });
 
+      if (!files.length) {
+        const text = e.dataTransfer ? e.dataTransfer.getData('text/plain') : '';
+        if (text && text.trim() && !e.target.closest('#sidebar')) insertFromText(text, w);
+        return;
+      }
       for (const file of files) {
         if (file.type.startsWith('image/')) {
           await imageNodeFrom(file, w);
-          w = { x: w.x + 26, y: w.y + 26 };
         } else if (/\.canvas$/i.test(file.name)) {
           toast('Use File → Import .canvas for canvas files');
-        }
+          continue;
+        } else if (/\.(md|markdown|txt)$/i.test(file.name)) {
+          const text = await file.text();
+          const lines = text.split('\n');
+          const h = /^#\s+(.*)$/.exec(lines[0] || '');
+          store.addNode(NODES.create('note', w.x, w.y, {
+            title: h ? h[1].trim() : file.name.replace(/\.(md|markdown|txt)$/i, ''),
+            body: h ? lines.slice(1).join('\n').replace(/^\n+/, '') : text,
+            h: Math.min(600, 120 + lines.length * 22),
+          }));
+        } else continue;
+        w = { x: w.x + 26, y: w.y + 26 };
       }
+    });
+  }
+
+  // ── context menu ────────────────────────────────────────────────────────
+  App.ctx = (() => {
+    let el;
+    function show(x, y, items) {
+      el.innerHTML = items.map((it, i) => it.sep
+        ? '<div class="ctx-sep"></div>'
+        : `<div class="ctx-item${it.disabled ? ' off' : ''}" data-i="${i}">
+             <span>${U.esc(it.label)}</span>${it.keys ? `<span class="ctx-keys">${U.esc(it.keys)}</span>` : ''}</div>`).join('');
+      el.querySelectorAll('[data-i]').forEach(d => d.addEventListener('click', () => {
+        const it = items[+d.dataset.i];
+        hide();
+        if (it && !it.disabled) it.run();
+      }));
+      el.classList.remove('hidden');
+      const w = el.offsetWidth, h = el.offsetHeight;
+      el.style.left = U.clamp(x, 8, window.innerWidth - w - 8) + 'px';
+      el.style.top = U.clamp(y, 8, window.innerHeight - h - 8) + 'px';
+    }
+    function hide() { el.classList.add('hidden'); }
+    const isOpen = () => !el.classList.contains('hidden');
+    function mount() {
+      el = document.getElementById('ctxmenu');
+      document.addEventListener('pointerdown', (e) => { if (isOpen() && !el.contains(e.target)) hide(); }, true);
+      window.addEventListener('blur', hide);
+    }
+    return { show, hide, isOpen, mount };
+  })();
+
+  function wireContextMenu() {
+    const vp = App.canvas.viewportEl;
+    vp.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const s = App.canvas.screenOf(e);
+      const w = App.canvas.toWorld(s);
+      const n = App.canvas.nodeAt(e);
+      let items;
+      if (n) {
+        if (!store.state.selection.has(n.id)) store.select(n.id);
+        items = nodeMenu(n);
+      } else {
+        const edge = App.canvas.edgeAt(w);
+        if (edge) {
+          store.clearSelection();
+          store.state.selectedEdge = edge.id;
+          store.emit('selection-changed');
+          items = edgeMenu(edge);
+        } else items = canvasMenu(w);
+      }
+      App.ctx.show(e.clientX, e.clientY, items);
+    });
+  }
+
+  function nodeMenu(n) {
+    const sel = store.selectedNodes();
+    const many = sel.length > 1;
+    const items = [
+      { label: many ? `Duplicate ${sel.length} blocks` : 'Duplicate', keys: '⌘D', run: () => store.duplicateSelected() },
+      { label: many ? `Delete ${sel.length} blocks` : 'Delete', keys: '⌫', run: () => store.deleteSelected() },
+      { sep: true },
+      { label: 'Bring to front', run: () => store.bringToFront() },
+      { label: 'Send to back', run: () => store.sendToBack() },
+      { label: 'Wrap in section', keys: '⇧⌘G', run: () => App.groups.wrapSelection() },
+      { label: 'Zoom to selection', keys: '⇧2', run: () => App.canvas.zoomToSelection() },
+    ];
+    if (many) {
+      items.push({ sep: true },
+        { label: 'Tidy into grid', run: () => App.arrange.tidy() },
+        { label: 'Select all of this type', keys: '⌘⇧A', run: () => runCmd('sel.similar') });
+    }
+    if (!many && n.type === 'note') items.push({ sep: true }, { label: 'Turn into its own page', run: () => promoteNoteToPage(n) });
+    if (!many && n.type === 'group') {
+      items.push({ sep: true },
+        { label: 'Select contents', run: () => { const kids = App.groups.childrenOf(n); if (kids.length) store.select(kids.map(k => k.id)); } },
+        { label: 'Make this section a paper sheet…', run: () => runCmd('cad.sheet') },
+        { label: 'Export section as PDF…', keys: '⌘P', run: () => App.exporter.sectionPdf(n) });
+    }
+    if (!many && n.type === 'embed' && n.pageId) items.push({ sep: true }, { label: 'Open embedded page', run: () => store.openPage(n.pageId) });
+    if (!many && n.type === 'link') {
+      items.push({ sep: true },
+        { label: 'Open link in browser', run: () => n.url && window.api.openExternal(n.url) },
+        { label: 'Edit link…', run: () => editLink(n) });
+    }
+    if (!many && n.type === 'dim') items.push({ sep: true }, { label: 'Override dimension text…', run: () => runCmd('cad.relabel') });
+    return items;
+  }
+
+  function edgeMenu(edge) {
+    const change = (fn) => { store.beginChange('arrow'); fn(); store.commit({ full: true }); };
+    return [
+      { label: edge.label ? 'Edit label…' : 'Add label…', run: () => prompt('Arrow label', edge.label || '', (v) => change(() => { edge.label = v.trim(); })) },
+      { label: 'Reverse direction', run: () => change(() => {
+          const f = edge.from, fp = edge.fromPt, fa = edge.fromAnchor;
+          edge.from = edge.to; edge.fromPt = edge.toPt; edge.fromAnchor = edge.toAnchor;
+          edge.to = f; edge.toPt = fp; edge.toAnchor = fa;
+        }) },
+      { sep: true },
+      { label: 'Delete arrow', keys: '⌫', run: () => store.deleteSelected() },
+    ];
+  }
+
+  function canvasMenu(w) {
+    const here = (type, extra) => () => {
+      const def = NODES.DEFAULTS[type];
+      const n = NODES.create(type, w.x, w.y, extra || {});
+      store.addNode(n);
+      requestAnimationFrame(() => App.canvas.focusNode(n.id));
+      void def;
+    };
+    return [
+      { label: 'Note here', keys: 'T', run: here('note') },
+      { label: 'Sticky here', keys: 'S', run: here('sticky') },
+      { label: 'Checklist here', keys: 'K', run: here('todo') },
+      { label: 'Table here', keys: 'B', run: here('table') },
+      { label: 'Section here', keys: 'F', run: here('group') },
+      { label: 'Link…', run: () => prompt('Link URL', 'https://', (v) => { if (URL_RE.test(v.trim())) insertFromText(v.trim(), w); else toast('That is not a web address'); }) },
+      { sep: true },
+      { label: 'Paste here', keys: '⌘V', run: async () => {
+          try {
+            const text = await navigator.clipboard.readText();
+            if (text && text.trim()) insertFromText(text, w); else toast('Nothing to paste');
+          } catch (_) { toast('Nothing to paste'); }
+        } },
+      { sep: true },
+      { label: 'Select everything', keys: '⌘A', run: () => store.select(store.doc().nodes.map(n => n.id)) },
+      { label: 'Zoom to fit', keys: '⇧1', run: () => App.canvas.zoomToFit() },
+      { label: 'Insert anything…', keys: '/', run: () => App.commands.open({ mode: 'insert' }) },
+    ];
+  }
+
+  function editLink(n) {
+    prompt('Link URL', n.url || '', (url) => {
+      prompt('Link title', n.title || '', (title) => {
+        store.beginChange('link');
+        n.url = url.trim(); n.title = title.trim();
+        const el = NODES.elOf(n.id); if (el) el._key = null;
+        store.commit({ full: true });
+      });
     });
   }
 
@@ -518,10 +709,20 @@ App.app = (() => {
   function markDirty() { saveEl.textContent = 'saving…'; saveEl.classList.add('dirty'); }
 
   function wireChrome() {
+    let nameAtFocus = null;
+    titleEl.addEventListener('focus', () => { nameAtFocus = store.doc() ? store.doc().name : null; });
     titleEl.addEventListener('input', () => { store.renamePage(titleEl.value); markDirty(); });
     titleEl.addEventListener('keydown', (e) => {
       e.stopPropagation();
       if (e.key === 'Enter' || e.key === 'Escape') titleEl.blur();
+    });
+    titleEl.addEventListener('blur', async () => {
+      const from = nameAtFocus; nameAtFocus = null;
+      if (from == null || !store.doc()) return;
+      const to = titleEl.value.trim() || 'Untitled';
+      titleEl.value = to;
+      const touched = await store.commitRename(from, to);
+      if (touched) toast(`Renamed — updated links on ${touched} page${touched === 1 ? '' : 's'}`);
     });
 
     const unitsBtn = document.getElementById('btn-units');
@@ -558,8 +759,21 @@ App.app = (() => {
     });
     document.getElementById('btn-theme').addEventListener('click', () =>
       store.setTheme(store.doc().theme === 'drafting' ? 'studio' : 'drafting'));
-    store.on('doc-changed', refreshUnitChip);
-    store.on('doc-changed', () => App.canvas.render());
+    store.on('doc-changed', () => {
+      refreshUnitChip();
+      // undo of a rename must reach the title box
+      if (document.activeElement !== titleEl && store.doc() && titleEl.value !== store.doc().name) titleEl.value = store.doc().name;
+      App.canvas.render();
+    });
+
+    // Every web link in the app goes to the default browser.
+    document.addEventListener('click', (e) => {
+      const a = e.target.closest && e.target.closest('a[href]');
+      if (!a) return;
+      const href = a.getAttribute('href') || '';
+      if (/^https?:\/\//i.test(href)) { e.preventDefault(); e.stopPropagation(); window.api.openExternal(href); }
+      else if (!href.startsWith('#')) e.preventDefault();
+    }, true);
   }
 
   function refreshUnitChip() {
@@ -574,8 +788,8 @@ App.app = (() => {
     on('menu:new-page', () => store.newPage());
     on('menu:switcher', () => App.commands.open());
     on('menu:palette', () => App.commands.open());
-    on('menu:undo', () => store.undo());
-    on('menu:redo', () => store.redo());
+    on('menu:undo', () => undoFromMenu(false));
+    on('menu:redo', () => undoFromMenu(true));
     on('menu:zoom-fit', () => App.canvas.zoomToFit());
     on('menu:zoom-sel', () => App.canvas.zoomToSelection());
     on('menu:zoom-100', () => App.canvas.zoomTo(1));
@@ -590,24 +804,28 @@ App.app = (() => {
     on('menu:pdf-page', () => App.exporter.pagePdf());
     on('menu:graph', () => App.graph.toggle());
     on('menu:outline', () => App.panels.toggleOutline());
+    on('menu:empty-trash', () => runCmd('vault.emptyTrash'));
     on('menu:change-vault', async () => {
+      if (store.state.dirty) await store.save();
       const p = await window.api.chooseVault();
       if (!p) return;
       store.state.vaultPath = p;
       await store.refreshIndex();
       if (store.state.pages[0]) store.openPage(store.state.pages[0].id);
+      else { const d = await store.newPage('Untitled canvas', { open: false }); store.openPage(d.id); }
     });
+    on('vault:external-change', (payload) => store.onExternalChange(payload || {}));
   }
 
   async function exportPng() {
-    App.canvas.zoomToFit(60);
-    store.clearSelection();
-    App.canvas.render();
-    await new Promise(r => setTimeout(r, 140));
-    const r = App.canvas.viewportEl.getBoundingClientRect();
-    const ok = await window.api.exportPng({
-      name: store.doc().name,
-      rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+    const ok = await App.exporter.withCleanCanvas(async () => {
+      App.canvas.zoomToFit(60);
+      await new Promise(r => setTimeout(r, 160));
+      const r = App.canvas.viewportEl.getBoundingClientRect();
+      return window.api.exportPng({
+        name: store.doc().name,
+        rect: { x: r.left, y: r.top, width: r.width, height: r.height },
+      });
     });
     if (ok) toast('PNG saved');
   }
@@ -627,6 +845,7 @@ App.app = (() => {
     App.slash.mount();
     App.graph.mount();
     App.panels.mount();
+    App.ctx.mount();
 
     if (localStorage.getItem('showSelection') === 'yes') {
       document.getElementById('app').classList.add('show-selection');
@@ -638,11 +857,16 @@ App.app = (() => {
     wirePaste();
     wireChrome();
     wireMenu();
+    wireContextMenu();
 
     store.on('selection-changed', () => App.canvas.renderOverlay());
     store.on('vault-changed', () => App.canvas.render());
     window.addEventListener('resize', () => { App.canvas.renderOverlay(); App.panels.drawMinimap(); });
-    window.addEventListener('beforeunload', () => { if (store.state.dirty) store.save(); });
+    // The window is going away: write synchronously so the last edits land.
+    window.addEventListener('beforeunload', () => {
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      store.flushSync();
+    });
 
     await store.init();
     store.setTool('select');
@@ -651,7 +875,8 @@ App.app = (() => {
     App.panels.refresh();
   }
 
-  return { boot, toast, prompt, choose, refreshUnitChip, promoteNoteToPage, openLink, toggleSidebar, exportPng, stickiesFromText };
+  return { boot, toast, prompt, choose, refreshUnitChip, promoteNoteToPage, openLink, toggleSidebar,
+           exportPng, stickiesFromText, insertFromText, editLink, isTyping };
 })();
 
 document.addEventListener('DOMContentLoaded', () => App.app.boot());

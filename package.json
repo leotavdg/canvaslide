@@ -2,16 +2,19 @@
   "name": "canvaslide",
   "productName": "CanvasLide",
   "version": "0.1.0",
-  "description": "Infinite canvas notes \u2014 FigJam \u00d7 Notion \u00d7 Obsidian",
+  "description": "Infinite canvas notes — FigJam × Notion × Obsidian",
   "main": "main.js",
   "author": "Leo",
   "license": "MIT",
   "scripts": {
     "start": "electron .",
     "dev": "electron . --remote-debugging-port=9222",
-    "package": "npx --yes @electron/packager . CanvasLide --platform=darwin --arch=arm64 --icon=assets/icon.icns --out=dist --overwrite --app-bundle-id=com.leo.canvaslide --app-version=0.1.0 --extend-info=build/Info.extra.plist --ignore=\"^/(dist|build)($|/)\""
+    "package": "npx --yes @electron/packager . CanvasLide --platform=darwin --arch=arm64 --icon=assets/icon.icns --out=dist --overwrite --app-bundle-id=com.leo.canvaslide --app-version=0.1.0 --extend-info=build/Info.extra.plist --ignore=\"^/(dist|build|test|\\.git|\\.claude-scratch)($|/)\"",
+    "test": "node --test",
+    "install-app": "npm run package && rm -rf /Applications/CanvasLide.app && cp -R dist/CanvasLide-darwin-arm64/CanvasLide.app /Applications/CanvasLide.app && echo \"Installed /Applications/CanvasLide.app\""
   },
   "devDependencies": {
-    "electron": "^44.0.0"
+    "electron": "^44.0.0",
+    "jsdom": "^29.1.1"
   }
 }

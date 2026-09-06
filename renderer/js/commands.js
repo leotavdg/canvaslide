@@ -279,6 +279,30 @@ App.commands = (() => {
       run: () => App.app.exportPng() });
     register({ id: 'file.reveal', title: 'Open vault folder', icon: '📂', group: 'File',
       run: () => window.api.revealVault() });
+    register({ id: 'insert.link', title: 'Link card (web address)', icon: '🌐', group: 'Insert', insert: true,
+      run: () => App.app.prompt('Link URL', 'https://', (v) => {
+        const t = v.trim();
+        if (!/^https?:\/\/\S+$/i.test(t)) return App.app.toast('That is not a web address');
+        const d = App.nodes.DEFAULTS.link;
+        const n = App.app.insertFromText(t, placeFor(d.w, d.h));
+        if (n) App.canvas.ensureVisible(n);
+      }) });
+    register({ id: 'vault.emptyTrash', title: 'Empty trash (deleted pages)', icon: '🗑', group: 'File',
+      run: async () => {
+        const n = await window.api.trashCount();
+        if (!n) return App.app.toast('The trash is empty');
+        if (confirm(`Permanently delete ${n} page${n === 1 ? '' : 's'} in the trash?`)) {
+          await window.api.emptyTrash();
+          App.app.toast('Trash emptied');
+        }
+      } });
+    register({ id: 'vault.revealTrash', title: 'Open trash folder (deleted pages)', icon: '📂', group: 'File',
+      run: () => window.api.revealTrash() });
+    register({ id: 'vault.cleanAssets', title: 'Delete unused images from the vault', icon: '🧹', group: 'File',
+      run: async () => {
+        const removed = await window.api.cleanAssets(store.referencedAssets());
+        App.app.toast(removed ? `Removed ${removed} unused image${removed === 1 ? '' : 's'}` : 'No unused images');
+      } });
   }
 
   // ── palette UI ──────────────────────────────────────────────────────────

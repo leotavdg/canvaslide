@@ -105,6 +105,12 @@ App.inspector = (() => {
         <button class="btn-sm" data-a="rebind">Point elsewhere</button></div>`);
     }
 
+    if (one && one.type === 'link') {
+      parts.push(`<div class="insp-label">Link</div><div class="insp-row">
+        <button class="btn-sm" data-a="openlink">Open in browser</button>
+        <button class="btn-sm" data-a="editlink">Edit link</button></div>`);
+    }
+
     if (one && one.type === 'table') {
       parts.push(`<div class="insp-label">Table</div><div class="insp-row">
         <button class="btn-sm" data-a="delrow">− row</button>
@@ -152,9 +158,9 @@ App.inspector = (() => {
 
     // Text size works on everything selected that carries text, so you can
     // set a whole drawing's labels in one go.
-    const texty = sel.filter(n => ['shape', 'dim', 'group', 'note', 'todo', 'table'].includes(n.type));
+    const texty = sel.filter(n => ['shape', 'dim', 'group', 'note', 'todo', 'table', 'sticky'].includes(n.type));
     if (texty.length) {
-      const DEF = { shape: 13, dim: 11.5, group: 12, note: 13, todo: 13, table: 13 };
+      const DEF = { shape: 13, dim: 11.5, group: 12, note: 13, todo: 13, table: 13, sticky: 15 };
       const cur = texty[0].fs == null ? DEF[texty[0].type] : texty[0].fs;
       const mixed = texty.some(n => (n.fs == null ? DEF[n.type] : n.fs) !== cur);
       parts.push(`<div class="insp-label">Text size · <b data-fslabel>${
@@ -236,11 +242,11 @@ App.inspector = (() => {
     })));
     const ew = el.querySelector('[data-eweight]');
     if (ew) ew.addEventListener('input', () => {
-      store.beginChange('thickness');
+      store.beginChange('thickness', { coalesce: 800 });
       e.weight = +ew.value;
       const out = el.querySelector('[data-ewout]');
       if (out) out.textContent = ew.value;
-      store.commit({ full: true });
+      store.commit({ full: true, from: 'inspector' });
     });
     el.querySelectorAll('[data-estyle]').forEach(b =>
       b.addEventListener('click', () => change(() => { e.style = b.dataset.estyle; })));
@@ -295,31 +301,31 @@ App.inspector = (() => {
 
     const sw = el.querySelector('[data-strokew]');
     if (sw) sw.addEventListener('input', () => {
-      store.beginChange('stroke');
+      store.beginChange('stroke', { coalesce: 800 });
       for (const n of sel) if (n.type === 'shape') n.stroke = +sw.value;
-      store.commit({ full: true });
+      store.commit({ full: true, from: 'inspector' });
     });
 
     const dw = el.querySelector('[data-dimweight]');
     if (dw) dw.addEventListener('input', () => {
-      store.beginChange('thickness');
+      store.beginChange('thickness', { coalesce: 800 });
       for (const n of sel) if (n.type === 'dim') { n.weight = +dw.value; const e2 =
         document.querySelector(`[data-id="${n.id}"]`); if (e2) e2._key = null; }
-      store.commit({ full: true });
+      store.commit({ full: true, from: 'inspector' });
     });
 
     const fs = el.querySelector('[data-fs]');
     if (fs) fs.addEventListener('input', () => {
-      store.beginChange('text size');
+      store.beginChange('text size', { coalesce: 800 });
       for (const n of sel) {
-        if (!['shape', 'dim', 'group', 'note', 'todo', 'table'].includes(n.type)) continue;
+        if (!['shape', 'dim', 'group', 'note', 'todo', 'table', 'sticky'].includes(n.type)) continue;
         n.fs = +fs.value;
         const e2 = document.querySelector(`[data-id="${n.id}"]`);
         if (e2) e2._key = null;                       // dims and sections repaint
       }
       const out = el.querySelector('[data-fslabel]');
       if (out) out.textContent = fs.value;
-      store.commit({ full: true });
+      store.commit({ full: true, from: 'inspector' });
     });
 
     el.querySelectorAll('[data-al]').forEach(b => b.addEventListener('click', () =>
@@ -350,6 +356,8 @@ App.inspector = (() => {
         store.commit({ full: true });
       }
       if (a === 'topage') App.app.promoteNoteToPage(sel[0]);
+      if (a === 'openlink' && sel[0].url) window.api.openExternal(sel[0].url);
+      if (a === 'editlink') App.app.editLink(sel[0]);
       if (a === 'pdfsection') App.exporter.sectionPdf(sel.find(n => n.type === 'group'));
       if (a === 'pdfall') App.exporter.allSectionsPdf();
       if (a === 'relabel') App.commands.all().find(c => c.id === 'cad.relabel').run();
@@ -402,7 +410,9 @@ App.inspector = (() => {
     cadEl = document.getElementById('cad-options');
     store.on('selection-changed', render);
     store.on('tool-changed', render);
-    store.on('doc-changed', render);
+    // a slider drag commits on every tick; rebuilding the panel mid-drag would
+    // destroy the slider under the pointer, so those commits skip the re-render
+    store.on('doc-changed', (o) => { if (!o || o.from !== 'inspector') render(); });
   }
 
   return { mount, render };

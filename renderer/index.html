@@ -68,20 +68,20 @@
 
     <!-- Floating tool dock -->
     <div id="toolbar">
-      <button class="tool" data-tool="select" title="Select — V"><span class="ti">↖</span></button>
-      <button class="tool" data-tool="hand"   title="Pan — H"><span class="ti">✋</span></button>
+      <button class="tool" data-tool="select" title="Select — V"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l15 8.5-6.5 1.5-3 6.5z"/></svg></button>
+      <button class="tool" data-tool="hand"   title="Pan — H"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11M11 11V4.5a1.5 1.5 0 0 1 3 0V11M14 11V6.5a1.5 1.5 0 0 1 3 0V14M8 12l-1.6-2.2a1.6 1.6 0 0 0-2.7 1.7L7 17.5A6 6 0 0 0 17 18.5V14"/></svg></button>
       <div class="tool-sep"></div>
-      <button class="tool" data-tool="note"   title="Note (markdown) — T"><span class="ti">📄</span></button>
-      <button class="tool" data-tool="sticky" title="Sticky note — S"><span class="ti">🟨</span></button>
-      <button class="tool" data-tool="todo"   title="Checklist — K"><span class="ti">☑</span></button>
-      <button class="tool" data-tool="shape"  title="Shape — R"><span class="ti">▭</span></button>
-      <button class="tool" data-tool="table"  title="Table — B"><span class="ti">▦</span></button>
-      <button class="tool" data-tool="group"  title="Section / frame — F"><span class="ti">⬚</span></button>
-      <button class="tool" data-tool="dim"    title="Dimension — M"><span class="ti">📐</span></button>
-      <button class="tool" data-tool="pen"    title="Draw — D"><span class="ti">✏️</span></button>
-      <button class="tool" data-tool="eraser" title="Erase ink — E"><span class="ti">🩹</span></button>
-      <button class="tool" data-tool="connect" title="Arrow / connector — A"><span class="ti">↗</span></button>
-      <button class="tool" data-tool="comment" title="Comment — C"><span class="ti">💬</span></button>
+      <button class="tool" data-tool="note"   title="Note (markdown) — T"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v4h4M9 12h6M9 16h6"/></svg></button>
+      <button class="tool" data-tool="sticky" title="Sticky note — S"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v11l-5 5H4zM15 20v-5h5"/></svg></button>
+      <button class="tool" data-tool="todo"   title="Checklist — K"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7l2 2 4-4M4 15l2 2 4-4M13 7h7M13 15h7"/></svg></button>
+      <button class="tool" data-tool="shape"  title="Shape — R"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4z"/></svg></button>
+      <button class="tool" data-tool="table"  title="Table — B"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4zM4 11h16M10 5v14"/></svg></button>
+      <button class="tool" data-tool="group"  title="Section / frame — F"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z" stroke-dasharray="3 2.2"/></svg></button>
+      <button class="tool" data-tool="dim"    title="Dimension — M"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h18M3 5v6M21 5v6M7 8v3M11 8v3M15 8v3M5 16l14 0"/></svg></button>
+      <button class="tool" data-tool="pen"    title="Draw — D"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l4-1L19 8l-3-3L5 16zM13 7l3 3"/></svg></button>
+      <button class="tool" data-tool="eraser" title="Erase ink — E"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 20h13M5 15l8-8 5 5-6 6H8zM9 11l5 5"/></svg></button>
+      <button class="tool" data-tool="connect" title="Arrow / connector — A"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 19L19 5M10 5h9v9"/></svg></button>
+      <button class="tool" data-tool="comment" title="Comment — C"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H9l-5 4z"/></svg></button>
     </div>
 
     <!-- Contextual inspector for the current selection -->
@@ -118,6 +118,7 @@
 <div id="suggest" class="suggest hidden"></div>
 <div id="slashmenu" class="suggest hidden"></div>
 <div id="prompt" class="switcher hidden"></div>
+<div id="ctxmenu" class="ctxmenu hidden"></div>
 <div id="units-pop" class="units-pop hidden"></div>
 <div id="sheet-pop" class="units-pop hidden"></div>
 

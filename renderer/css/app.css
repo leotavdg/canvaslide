@@ -196,7 +196,7 @@ kbd {
 }
 .node.sticky .s-text {
   width: 100%; height: 100%; padding: 14px; outline: none; user-select: text;
-  color: #1c1c1c; font-size: 15px; line-height: 1.4; font-weight: 500;
+  color: #1c1c1c; font-size: calc(var(--fs, 15) * 1px); line-height: 1.4; font-weight: 500;
   overflow-y: auto; text-align: center; display: flex; align-items: center;
   justify-content: center; flex-direction: column;
 }
@@ -270,20 +270,6 @@ kbd {
 .md .md-check { margin-right: 6px; }
 .md strong { color: var(--text); }
 
-/* resize + connector handles */
-.handle {
-  position: absolute; width: 9px; height: 9px; background: var(--bg);
-  border: 1.5px solid var(--accent); border-radius: 2px; z-index: 30;
-}
-.handle.h-nw { cursor: nwse-resize; } .handle.h-ne { cursor: nesw-resize; }
-.handle.h-sw { cursor: nesw-resize; } .handle.h-se { cursor: nwse-resize; }
-.port {
-  position: absolute; width: 11px; height: 11px; border-radius: 50%;
-  background: var(--accent); opacity: 0; z-index: 29; cursor: crosshair;
-  border: 2px solid var(--bg);
-}
-.node:hover .port, .port.show { opacity: .9; }
-
 /* edges */
 .edge-path { fill: none; stroke: var(--text-mute); stroke-width: 2; }
 .edge-path.sel { stroke: var(--accent); }
@@ -343,8 +329,11 @@ kbd {
 }
 .tool:hover { background: var(--panel-2); }
 .tool.active { background: var(--accent); }
-.tool .ti { filter: grayscale(.35); }
-.tool.active .ti { filter: none; }
+.tool { color: var(--text-dim); }
+.tool:hover { color: var(--text); }
+.tool.active { color: #fff; }
+.tool svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.75;
+  stroke-linecap: round; stroke-linejoin: round; display: block; }
 .tool-sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 
 /* ── Inspector ────────────────────────────────────────────────────────── */
@@ -380,12 +369,12 @@ kbd {
   width: 520px; background: var(--panel); border: 1px solid var(--line);
   border-radius: 14px; box-shadow: 0 30px 80px rgba(0,0,0,.6); overflow: hidden;
 }
-#switcher-input {
+#palette-input {
   width: 100%; background: transparent; border: none; outline: none;
   padding: 15px 18px; font-size: 15px; color: var(--text); user-select: text;
   border-bottom: 1px solid var(--line-soft);
 }
-#switcher-results { max-height: 320px; overflow-y: auto; padding: 6px; }
+#palette-results { max-height: 320px; overflow-y: auto; padding: 6px; }
 .sw-item { padding: 9px 12px; border-radius: 8px; font-size: 13px; color: var(--text-dim);
   display: flex; justify-content: space-between; gap: 10px; }
 .sw-item.on { background: var(--panel-2); color: var(--text); }
@@ -559,19 +548,6 @@ kbd {
   box-shadow: 0 10px 30px rgba(0,0,0,.45); pointer-events: none;
 }
 
-/* ── align bar for multi-selection ────────────────────────────────────── */
-.align-bar {
-  position: absolute; z-index: 45; display: flex; gap: 2px; padding: 4px;
-  background: rgba(31,31,37,.96); backdrop-filter: blur(20px);
-  border: 1px solid var(--line); border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0,0,0,.45);
-}
-.align-bar button {
-  width: 27px; height: 27px; border: none; background: transparent;
-  border-radius: 6px; font-size: 13px; color: var(--text-dim);
-}
-.align-bar button:hover { background: var(--panel-2); color: var(--text); }
-
 /* markdown callouts + tables inside notes */
 .md-callout {
   display: flex; gap: 9px; padding: 8px 11px; margin: .5em 0;
@@ -632,7 +608,7 @@ kbd {
    app stops being a fixed-height flex shell so the document can run to N pages. */
 #app.printing { display: block; height: auto; overflow: visible; }
 #app.printing > #sidebar, #app.printing #topbar, #app.printing #toolbar,
-#app.printing #dock, #app.printing #world { display: none !important; }
+#app.printing #world { display: none !important; }
 #app.printing #stage { display: block; position: static; }
 #app.printing #viewport {
   position: static; overflow: visible; height: auto;
@@ -642,6 +618,7 @@ kbd {
 .pdf-page { position: relative; overflow: hidden; background: var(--bg); break-after: page; }
 .pdf-page:last-child { break-after: auto; }
 .pdf-world { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.pdf-world .pin { display: none; }   /* comments are notes to yourself, not part of the drawing */
 
 /* Printing on a white page: re-point the tokens, everything else follows. */
 #app.exporting.on-white {
@@ -820,3 +797,20 @@ kbd {
 }
 .mount-cell:hover { border-color: var(--text-mute); }
 .mount-cell.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ── context menu ─────────────────────────────────────────────────────── */
+.ctxmenu {
+  position: fixed; z-index: 650; min-width: 190px; padding: 5px;
+  background: rgba(31,31,37,.98); backdrop-filter: blur(20px);
+  border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 16px 44px rgba(0,0,0,.5); user-select: none;
+}
+.ctx-item {
+  display: flex; justify-content: space-between; gap: 18px; align-items: center;
+  padding: 6px 10px; border-radius: 6px; font-size: 12.5px; color: var(--text-dim);
+}
+.ctx-item:hover { background: var(--accent); color: #fff; }
+.ctx-item:hover .ctx-keys { color: rgba(255,255,255,.75); }
+.ctx-item.off { opacity: .4; pointer-events: none; }
+.ctx-keys { font-size: 10.5px; color: var(--text-mute); font-family: var(--mono); }
+.ctx-sep { height: 1px; background: var(--line-soft); margin: 4px 6px; }

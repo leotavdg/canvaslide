@@ -69,7 +69,7 @@ App.jsoncanvas = (() => {
       }
       if (n.type === 'image' && n.src) {
         // strip the file:// + vault prefix so the path stays vault-relative
-        const rel = String(n.src).replace(/^file:\/\//, '').replace(store.state.vaultPath + '/', '');
+        const rel = String(n.src).replace(/^file:\/\//, '').replace(store.state.vaultPath + '/', '');   // already relative for new files
         nodes.push({ ...base, type: 'file', file: rel, canvaslide: n });
         continue;
       }
@@ -132,7 +132,7 @@ App.jsoncanvas = (() => {
     if (cn.type === 'file') {
       const f = String(cn.file || '');
       if (/\.(png|jpe?g|gif|webp|svg)$/i.test(f)) {
-        return { ...base, type: 'image', src: `file://${store.state.vaultPath}/${f}` };
+        return { ...base, type: 'image', src: f };   // vault-relative
       }
       return { ...base, type: 'note', title: f.split('/').pop(), body: `Linked file: \`${f}\`` };
     }

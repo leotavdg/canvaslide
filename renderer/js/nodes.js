@@ -9,7 +9,7 @@
 App.nodes = (() => {
   const U = App.util;
   const S = () => App.store;
-  const NBSP = /\u00a0/g;
+  const NBSP = / /g;
 
   // ── factories ───────────────────────────────────────────────────────────
   const DEFAULTS = {
@@ -76,17 +76,32 @@ App.nodes = (() => {
     n.h = (y2 - y1) + pad * 2;
   }
 
+  /** Images are stored vault-relative ("assets/x.png") so a vault can move
+   *  between Macs; absolute and data: URLs pass straight through. */
+  function assetUrl(src) {
+    const s = String(src || '');
+    if (!s) return '';
+    if (/^(file:|https?:|data:)/i.test(s)) return s;
+    return 'file://' + encodeURI(`${S().state.vaultPath}/${s}`);
+  }
+
   // ── rendering ───────────────────────────────────────────────────────────
+  const drafting = () => document.getElementById('app').classList.contains('drafting');
+  const light = () => App.exporter && App.exporter.isLight() ? 'L' : 'D';
+  // wikilinks change look when a page appears or is renamed, so blocks that
+  // hold one re-render when the vault changes
+  const linky = (t) => (t && t.includes('[[')) ? '|v' + S().state.vaultRev : '';
+
   /** Signature of a node's *content*; when it changes we re-render the guts. */
   function contentKey(n) {
     switch (n.type) {
-      case 'note':   return `${n.title} ${n.body}`;
-      case 'sticky': return `${n.text} ${n.color}`;
+      case 'note':   return `${n.title} ${n.body}${linky(n.body)}`;
+      case 'sticky': return `${n.text} ${n.color}${linky(n.text)}`;
       case 'todo':   return `${n.title} ` + n.items.map(i => `${i.done ? 1 : 0}${i.text}`).join('');
-      case 'shape':  return `${n.kind} ${n.color} ${n.filled} ${n.stroke} ${n.fs} ${n.text} ${document.getElementById('app').classList.contains('drafting') ? 'D' : 'S'}`;
-      case 'image':  return n.src || '';
-      case 'ink':    return `${n.strokes.length}:${n.w}x${n.h}:${App.exporter && App.exporter.isLight() ? 'L' : 'D'}:` + n.strokes.map(s => s.points.length + s.color + s.size).join(',');
-      case 'dim':    return `${n.pts.map(p => p.join(',')).join(';')}|${n.off}|${n.color}|${n.weight}|${n.fs}|${n.label}|${App.cad.scaleKey()}|${App.exporter && App.exporter.isLight() ? 'L' : 'D'}`;
+      case 'shape':  return `${n.kind} ${n.color} ${n.filled} ${n.stroke} ${n.fs} ${n.text} ${drafting() ? 'D' : 'S'}`;
+      case 'image':  return `${n.src || ''}@${S().state.vaultPath}`;
+      case 'ink':    return `${n.strokes.length}:${n.w}x${n.h}:${light()}:` + n.strokes.map(s => s.points.length + s.color + s.size).join(',');
+      case 'dim':    return `${n.pts.map(p => p.join(',')).join(';')}|${n.off}|${n.color}|${n.weight}|${n.fs}|${n.label}|${App.cad.scaleKey()}|${light()}`;
       case 'table':  return n.cols.join('|') + '#' + n.rows.map(r => r.join('|')).join('#');
       case 'group':  return `${n.label} ${n.color} ${n.fs} ${n.sheet || ''} ${n.orient || ''}`;
       case 'embed':  return `${n.pageId} ${n.pageName} ${App.store.embedRevision(n.pageId)}`;
@@ -97,8 +112,17 @@ App.nodes = (() => {
     }
   }
 
+  // id → element, so repaints don't scan the layer once per node
+  const els = new Map();
+  function elOf(id) {
+    const el = els.get(id);
+    if (el && el.isConnected) return el;
+    if (el) els.delete(id);
+    return null;
+  }
+
   function ensureEl(n, layer) {
-    let el = layer.querySelector(`[data-id="${n.id}"]`);
+    let el = elOf(n.id);
     if (!el) {
       el = document.createElement('div');
       el.className = `node ${n.type}`;
@@ -106,9 +130,12 @@ App.nodes = (() => {
       el.dataset.type = n.type;
       layer.appendChild(el);
       el._key = null;
+      els.set(n.id, el);
     }
     return el;
   }
+
+  function forget(id) { els.delete(id); }
 
   function paint(n, el) {
     el.style.left = n.x + 'px';
@@ -184,9 +211,8 @@ App.nodes = (() => {
                      stroke-linecap="round" vector-effect="non-scaling-stroke"/>`;
             break;
           default: {
-            const drafting = document.getElementById('app').classList.contains('drafting');
             shape = `<rect x="${sw / 2}" y="${sw / 2}" width="calc(100% - ${sw}px)" height="calc(100% - ${sw}px)"
-                     rx="${drafting ? 0 : 8}" fill="${fill}" stroke="${sw ? n.color : 'none'}" stroke-width="${sw}"
+                     rx="${drafting() ? 0 : 8}" fill="${fill}" stroke="${sw ? n.color : 'none'}" stroke-width="${sw}"
                      vector-effect="non-scaling-stroke"/>`;
           }
         }
@@ -201,7 +227,7 @@ App.nodes = (() => {
 
       case 'image':
         return n.src
-          ? `<img src="${U.esc(n.src)}" draggable="false">`
+          ? `<img src="${U.esc(assetUrl(n.src))}" draggable="false">`
           : `<div style="padding:14px;color:var(--text-mute)">No image</div>`;
 
       case 'ink': {
@@ -264,7 +290,12 @@ App.nodes = (() => {
 
       case 'title': {
         const s2 = App.cad.scale();
-        const scaleTxt = s2.unit === 'px' ? '—' : `1 px = ${s2.perPx} ${s2.unit}`;
+        // a title block says 1:50, not "1 px = 50 mm"
+        const preset = App.cad.PRESETS.find(p => Math.abs(p.f - Number(s2.perPx)) < 1e-9);
+        const scaleTxt = s2.unit === 'px' ? 'NTS'
+          : preset ? preset.label
+          : Number.isInteger(Number(s2.perPx)) ? `1:${s2.perPx}`
+          : `1 px = ${s2.perPx} ${s2.unit}`;
         const f = (key, label, value, cls) => `
           <div class="tb-field ${cls || ''}">
             <span class="tb-key">${label}</span>
@@ -298,15 +329,7 @@ App.nodes = (() => {
   }
 
   // ── editing ─────────────────────────────────────────────────────────────
-  /** Pull DOM text back into the model. Returns true when it changed. */
-  function readField(n, el, field) {
-    const t = el.innerText.replace(NBSP, ' ');
-    if (n[field] === t) return false;
-    n[field] = t;
-    return true;
-  }
-
-  /** Note bodies edit as raw markdown, then re-render on blur. */
+  /** Note bodies edit as rendered markdown, then convert back on blur. */
   function beginBodyEdit(node, el) {
     const body = el.querySelector('.n-body');
     if (!body || body.classList.contains('editing')) return;
@@ -325,16 +348,22 @@ App.nodes = (() => {
     sel.addRange(range);
   }
 
-  function endBodyEdit(node, el) {
+  /** `began` says whether an undo snapshot was already taken for this edit. A
+   *  body that was clicked into and left untouched commits nothing at all. */
+  function endBodyEdit(node, el, began = false) {
     const body = el.querySelector('.n-body');
     if (!body || !body.classList.contains('editing')) return;
-    App.store.beginChange('edit');
-    node.body = App.md.toMarkdown(body).replace(NBSP, ' ');
+    const md = App.md.toMarkdown(body).replace(NBSP, ' ');
     body.classList.remove('editing');
     body.removeAttribute('contenteditable');
+    const same = md.trim() === String(node.body || '').trim();
+    if (same && !began) { el._key = null; App.canvas.render(); return; }
+    if (!began) App.store.beginChange('edit');
+    node.body = md;
     el._key = null;
     App.store.commit();
   }
 
-  return { create, reflowInk, ensureEl, paint, inner, contentKey, readField, beginBodyEdit, endBodyEdit, DEFAULTS };
+  return { create, reflowInk, ensureEl, elOf, forget, paint, inner, contentKey, assetUrl,
+           beginBodyEdit, endBodyEdit, DEFAULTS };
 })();

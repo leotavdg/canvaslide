@@ -12,7 +12,7 @@ App.graph = (() => {
   const store = App.store;
 
   let box, svg, hint;
-  let nodes = [], links = [], raf = null, alpha = 0;
+  let nodes = [], links = [], raf = null, alpha = 0, needDraw = true;
   let view = { x: 0, y: 0, z: 1 };
   let drag = null, hover = null;
   let localOnly = false;
@@ -83,6 +83,7 @@ App.graph = (() => {
       links.push({ a: index.get(a), b: index.get(b) });
     }
     alpha = 1;
+    needDraw = true;
   }
 
   function step() {
@@ -148,9 +149,11 @@ App.graph = (() => {
     hint.textContent = `${nodes.length} page${nodes.length === 1 ? '' : 's'} · ${links.length} link${links.length === 1 ? '' : 's'}`;
   }
 
+  // Redraw only when something moved: once the layout settles the SVG is
+  // left alone instead of being rebuilt sixty times a second.
   function tick() {
-    if (alpha > 0.004) step();
-    draw();
+    if (alpha > 0.004) { step(); needDraw = true; }
+    if (needDraw) { draw(); needDraw = false; }
     raf = requestAnimationFrame(tick);
   }
 
@@ -180,9 +183,10 @@ App.graph = (() => {
       const p = toLocal(e);
       const over = nodeAt(p);
       const id = over ? over.id : null;
-      if (id !== hover) { hover = id; svg.style.cursor = id ? 'pointer' : 'grab'; }
+      if (id !== hover) { hover = id; needDraw = true; svg.style.cursor = id ? 'pointer' : 'grab'; }
       if (!drag) return;
       drag.moved = true;
+      needDraw = true;
       if (drag.pan) {
         view.x = drag.vx + (e.clientX - drag.sx);
         view.y = drag.vy + (e.clientY - drag.sy);
@@ -211,6 +215,7 @@ App.graph = (() => {
       view.x = mx - (mx - view.x) * (z2 / view.z);
       view.y = my - (my - view.y) * (z2 / view.z);
       view.z = z2;
+      needDraw = true;
     }, { passive: false });
   }
 

@@ -392,7 +392,7 @@ App.canvas = (() => {
     c.z = z2;
     gesturing();
     cameraOnly();
-    store.touch();
+    store.saveCamera();
   }
 
   function zoomTo(z) {
@@ -412,7 +412,7 @@ App.canvas = (() => {
     c.x = r.width / 2 - (box.x + box.w / 2) * z;
     c.y = r.height / 2 - (box.y + box.h / 2) * z;
     render();
-    store.touch();
+    store.saveCamera();
   }
 
   /** Centre the camera on an arbitrary world point (used by minimap/outline). */
@@ -422,7 +422,7 @@ App.canvas = (() => {
     c.x = r.width / 2 - p.x * c.z;
     c.y = r.height / 2 - p.y * c.z;
     render();
-    store.touch();
+    store.saveCamera();
   }
 
   /** Bring a node into view only if it isn't already comfortably visible. */
@@ -446,7 +446,7 @@ App.canvas = (() => {
     c.x = r.width / 2 - (box.x + box.w / 2) * c.z;
     c.y = r.height / 2 - (box.y + box.h / 2) * c.z;
     render();
-    store.touch();
+    store.saveCamera();
   }
 
   function centerOn(n) {
@@ -455,7 +455,7 @@ App.canvas = (() => {
     c.x = r.width / 2 - (n.x + n.w / 2) * c.z;
     c.y = r.height / 2 - (n.y + n.h / 2) * c.z;
     render();
-    store.touch();
+    store.saveCamera();
   }
 
   // ── hit testing ─────────────────────────────────────────────────────────
@@ -850,7 +850,7 @@ App.canvas = (() => {
           n.pts[g.origin.which] = [p.x - n.x, p.y - n.y];
         }
         App.cad.reflowDim(n);
-        const el = layerNodes.querySelector(`[data-id="${n.id}"]`);
+        const el = NODES.elOf(n.id);
         if (el) el._key = null;
         paintOnly();
         break;
@@ -888,7 +888,7 @@ App.canvas = (() => {
 
     if (mode === 'pan') {
       viewport.classList.remove('panning');
-      store.touch();
+      store.saveCamera();
     }
 
     if (mode === 'drag') {
@@ -986,7 +986,7 @@ App.canvas = (() => {
   function paintOnly() {
     const d = store.doc();
     for (const n of d.nodes) {
-      const el = layerNodes.querySelector(`[data-id="${n.id}"]`);
+      const el = NODES.elOf(n.id);
       if (el) NODES.paint(n, el);
     }
     renderEdges(d);
@@ -1045,7 +1045,6 @@ App.canvas = (() => {
     if (node.type === 'dim') return;
     if (node.type === 'ink' && box.w && box.h) {
       const sx = ww / box.w, sy = hh / box.h;
-      const prev = node._scale || 1;
       // rescale from the pristine copy so repeated moves don't compound
       if (!g.origin.pristine) g.origin.pristine = structuredClone(node.strokes);
       node.strokes = structuredClone(g.origin.pristine);
@@ -1053,7 +1052,6 @@ App.canvas = (() => {
         for (const p of st.points) { p[0] *= sx; p[1] *= sy; }
         st.size = Math.max(0.6, st.size * Math.min(sx, sy));
       }
-      void prev;
     }
 
     node.x = Math.round(x); node.y = Math.round(y);
@@ -1100,7 +1098,7 @@ App.canvas = (() => {
       c.y -= e.deltaY;
       applyCamera();
       renderOverlay();
-      store.touch();
+      store.saveCamera();
     }
   }
 
@@ -1149,7 +1147,7 @@ App.canvas = (() => {
 
   /** Put the caret in a node's primary text field. */
   function focusNode(id) {
-    const el = layerNodes.querySelector(`[data-id="${id}"]`);
+    const el = NODES.elOf(id);
     if (!el) return;
     const target = el.querySelector('.n-title, .s-text, .t-title, .sh-text, .gr-label, .tb-cell');
     if (!target) return;

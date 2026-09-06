@@ -4,6 +4,9 @@
 
    "Unlinked mentions" is the quiet Obsidian feature people credit with making
    a vault feel alive: it surfaces the links you meant to make and didn't.
+
+   The tree is rebuilt only when the vault's shape changes (a page appears,
+   is renamed or moves); the panes below it refresh on every content change.
    =========================================================================== */
 App.sidebar = (() => {
   const U = App.util;
@@ -13,12 +16,15 @@ App.sidebar = (() => {
   let tab = 'links';
   let activeTag = null;
 
+  const byName = (a, b) => String(a.name || '').localeCompare(String(b.name || ''), undefined, { numeric: true, sensitivity: 'base' });
+
   function render() {
     const q = searchEl.value.trim();
+    const scroll = listEl.scrollTop;
     listEl.innerHTML = '';
 
     if (activeTag) {
-      const pages = store.pagesWithTag(activeTag);
+      const pages = store.pagesWithTag(activeTag).sort(byName);
       const head = U.el('div', 'list-label', `#${U.esc(activeTag)} · ${pages.length}`);
       const clear = U.el('span', '', ' ✕');
       clear.style.cssText = 'float:right;cursor:default';
@@ -42,12 +48,20 @@ App.sidebar = (() => {
     }
 
     renderTree();
+    listEl.scrollTop = scroll;
     renderPanes();
+  }
+
+  /** Only the "active" highlight changed: no need to rebuild the tree. */
+  function markActive() {
+    const id = store.doc() && store.doc().id;
+    listEl.querySelectorAll('.page-item').forEach(r => r.classList.toggle('active', r.dataset.id === id));
   }
 
   function pageRow(p, withCount) {
     const open = store.doc() && store.doc().id === p.id;
     const row = U.el('div', 'page-item' + (open ? ' active' : ''));
+    row.dataset.id = p.id;
     row.draggable = true;
     row.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/page', p.id);
@@ -56,15 +70,51 @@ App.sidebar = (() => {
     row.innerHTML = `
       <span class="pi-name">${U.esc(p.name || 'Untitled')}</span>
       ${withCount && p.nodeCount != null ? `<span class="pi-count">${p.nodeCount}</span>` : ''}
-      <span class="pi-del" title="Delete page">×</span>`;
+      <span class="pi-del" title="Move page to trash">×</span>`;
     row.addEventListener('click', (e) => {
-      if (e.target.classList.contains('pi-del')) {
-        if (confirm(`Delete "${p.name}"? This removes the file from your vault.`)) store.deletePage(p.id);
-        return;
-      }
+      if (e.target.classList.contains('pi-del')) return deletePage(p);
       store.openPage(p.id);
     });
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      App.ctx.show(e.clientX, e.clientY, pageMenu(p));
+    });
     return row;
+  }
+
+  function deletePage(p) {
+    if (confirm(`Move "${p.name}" to the trash? You can get it back from the vault's .trash folder.`)) store.deletePage(p.id);
+  }
+
+  function pageMenu(p) {
+    return [
+      { label: 'Open', run: () => store.openPage(p.id) },
+      { label: 'Rename…', run: () => App.app.prompt('Rename page', p.name, async (v) => {
+          const to = v.trim();
+          if (!to || to === p.name) return;
+          if (!store.doc() || store.doc().id !== p.id) await store.openPage(p.id);
+          document.getElementById('page-title').value = to;
+          const touched = await store.commitRename(p.name, to);
+          if (touched) App.app.toast(`Renamed — updated links on ${touched} page${touched === 1 ? '' : 's'}`);
+        }) },
+      { label: 'Move to folder…', run: () => {
+          const opts = ['(vault root)', ...store.state.folders];
+          App.app.choose('Move to folder', opts, (pick, i, made) => {
+            const target = made || (i === 0 ? '' : opts[i]);
+            store.movePage(p.id, target);
+          }, { allowNew: 'New folder…' });
+        } },
+      { label: 'Embed in current page', run: () => {
+          if (!store.doc() || store.doc().id === p.id) return;
+          const d = App.nodes.DEFAULTS.embed;
+          const at = App.commands.placeFor(d.w, d.h);
+          const n = App.nodes.create('embed', at.x, at.y, { pageId: p.id, pageName: p.name });
+          store.addNode(n);
+          App.canvas.ensureVisible(n);
+        } },
+      { sep: true },
+      { label: 'Move to trash', run: () => deletePage(p) },
+    ];
   }
 
   /** The vault as a folder tree — the same tree that's on disk. */
@@ -77,6 +127,7 @@ App.sidebar = (() => {
     }
     // folders with no pages still deserve a row
     for (const f of store.state.folders) if (!byFolder.has(f)) byFolder.set(f, []);
+    for (const list of byFolder.values()) list.sort(byName);
 
     const root = byFolder.get('') || [];
     byFolder.delete('');
@@ -146,6 +197,7 @@ App.sidebar = (() => {
     el.addEventListener('dragleave', () => el.classList.remove('drop-on'));
     el.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       el.classList.remove('drop-on');
       const id = e.dataTransfer.getData('text/page');
       if (id) store.movePage(id, folder);
@@ -248,6 +300,7 @@ App.sidebar = (() => {
       App.app.prompt('New folder name', '', (v) => { if (v.trim()) store.newFolder(v.trim()); }));
     document.getElementById('btn-reveal').addEventListener('click', () => window.api.revealVault());
 
+    // shape of the vault changed: rebuild the tree
     store.on('vault-changed', () => {
       const path = store.state.vaultPath || '';
       const btn = document.getElementById('btn-reveal');
@@ -255,7 +308,13 @@ App.sidebar = (() => {
       btn.title = 'Reveal ' + path;
       render();
     });
-    store.on('page-opened', render);
+    // content changed (a save): only the backlink / tag panes can differ
+    let paneTimer = null;
+    store.on('index-changed', () => {
+      clearTimeout(paneTimer);
+      paneTimer = setTimeout(() => { if (searchEl.value.trim()) render(); else renderPanes(); }, 150);
+    });
+    store.on('page-opened', () => { markActive(); renderPanes(); });
   }
 
   return { mount, render, showTag };

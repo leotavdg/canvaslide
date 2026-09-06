@@ -3,15 +3,18 @@
    store.js — the document model.
 
    One page = one doc = one JSON file in the vault:
-     { id, name, nodes[], edges[], comments[], camera }
+     { version, id, name, nodes[], edges[], comments[], camera }
 
    Mutations go through commit() so undo/redo and autosave stay honest.
    =========================================================================== */
 App.store = (() => {
   const U = App.util;
 
+  const DOC_VERSION = 1;
+
   const state = {
     vaultPath: '',
+    vaultRev: 0,          // bumps whenever the set of pages changes (names, folders, count)
     pages: [],            // vault index: {id,name,folder,updated,nodeCount}
     folders: [],          // every folder in the vault, including empty ones
     collapsed: new Set(JSON.parse(localStorage.getItem('collapsedFolders') || '[]')),
@@ -34,6 +37,7 @@ App.store = (() => {
   // ── doc factory ─────────────────────────────────────────────────────────
   function blankDoc(name = 'Untitled canvas') {
     return {
+      version: DOC_VERSION,
       id: U.uid('page'),
       name,
       created: Date.now(),
@@ -46,27 +50,73 @@ App.store = (() => {
     };
   }
 
+  /** Bring an older file up to the current shape. Cheap, idempotent, and the
+   *  one place to put future migrations. */
+  function migrate(d) {
+    d.nodes ||= []; d.edges ||= []; d.comments ||= [];
+    d.camera ||= { x: 0, y: 0, z: 1 };
+    d.theme ||= 'studio';
+    if (!d.version) {
+      // images used to store the vault's absolute path; keep the vault-relative part
+      for (const n of d.nodes) {
+        if (n.type === 'image' && typeof n.src === 'string') {
+          const i = n.src.indexOf('/assets/');
+          if (n.src.startsWith('file://') && i >= 0) n.src = decodeURI(n.src.slice(i + 1));
+        }
+      }
+      for (const e of d.edges) {
+        if (e.arrow != null && !e.heads) { e.heads = e.arrow ? 'end' : 'none'; delete e.arrow; }
+        e.style ||= 'curve';
+      }
+      d.version = DOC_VERSION;
+    }
+    return d;
+  }
+
   const doc = () => state.doc;
-  const nodeById = (id) => state.doc?.nodes.find(n => n.id === id);
+
+  // id → node, rebuilt whenever the nodes array changes identity or length
+  // (every mutation path either replaces the array or pushes/filters it).
+  let nodeCache = { arr: null, len: -1, map: new Map() };
+  function nodeById(id) {
+    const d = state.doc;
+    if (!d) return undefined;
+    if (nodeCache.arr !== d.nodes || nodeCache.len !== d.nodes.length) {
+      nodeCache = { arr: d.nodes, len: d.nodes.length, map: new Map(d.nodes.map(n => [n.id, n])) };
+    }
+    return nodeCache.map.get(id);
+  }
+  const invalidateNodes = () => { nodeCache.arr = null; };
+
   const selectedNodes = () => state.doc ? state.doc.nodes.filter(n => state.selection.has(n.id)) : [];
   const topZ = () => (state.doc?.nodes.reduce((m, n) => Math.max(m, n.z || 0), 0) || 0);
 
   // ── history ─────────────────────────────────────────────────────────────
-  let pendingLabel = null;
+  let lastLabel = null, lastAt = 0;
   function snapshot() {
-    return JSON.stringify({ nodes: state.doc.nodes, edges: state.doc.edges, comments: state.doc.comments });
+    return JSON.stringify({ name: state.doc.name, nodes: state.doc.nodes, edges: state.doc.edges, comments: state.doc.comments });
   }
   function restore(snap) {
     const s = JSON.parse(snap);
     state.doc.nodes = s.nodes; state.doc.edges = s.edges; state.doc.comments = s.comments;
+    if (s.name != null) state.doc.name = s.name;
+    invalidateNodes();
     // drop selections pointing at nodes that no longer exist
     for (const id of [...state.selection]) if (!nodeById(id)) state.selection.delete(id);
   }
 
-  /** Call BEFORE mutating when you want the change to be undoable. */
-  function beginChange(label) {
+  /** Call BEFORE mutating when you want the change to be undoable.
+   *  A repeated change with the same label inside `coalesce` ms (a held arrow
+   *  key, a slider drag) folds into the previous entry instead of adding one. */
+  function beginChange(label, opts = {}) {
     if (!state.doc) return;
-    pendingLabel = label;
+    const now = Date.now();
+    const ms = opts.coalesce || 0;
+    if (ms && label && label === lastLabel && now - lastAt < ms && state.undo.length) {
+      lastAt = now;
+      return;
+    }
+    lastLabel = label; lastAt = now;
     state.undo.push(snapshot());
     if (state.undo.length > 120) state.undo.shift();
     state.redo.length = 0;
@@ -77,17 +127,28 @@ App.store = (() => {
     if (!state.doc) return;
     state.doc.updated = Date.now();
     state.dirty = true;
+    invalidateNodes();
     emit('doc-changed', opts);
     scheduleSave();
   }
 
-  /** Mark dirty + schedule a save WITHOUT a re-render (camera moves, etc). */
+  /** Mark dirty + schedule a save WITHOUT a re-render (content edits mid-typing). */
   function touch() { state.dirty = true; emit('dirty'); scheduleSave(); }
+
+  /** The camera is a view preference, not content: remember it per page in
+   *  localStorage and never let it dirty the file. */
+  const cameraKey = (id) => `cam:${id}`;
+  const persistCamera = U.debounce(() => {
+    if (!state.doc) return;
+    try { localStorage.setItem(cameraKey(state.doc.id), JSON.stringify(state.doc.camera)); } catch (_) {}
+  }, 300);
+  function saveCamera() { persistCamera(); }
 
   function undo() {
     if (!state.undo.length) return;
     state.redo.push(snapshot());
     restore(state.undo.pop());
+    lastLabel = null;
     commit({ full: true });
     emit('selection-changed');
   }
@@ -95,6 +156,7 @@ App.store = (() => {
     if (!state.redo.length) return;
     state.undo.push(snapshot());
     restore(state.redo.pop());
+    lastLabel = null;
     commit({ full: true });
     emit('selection-changed');
   }
@@ -102,12 +164,35 @@ App.store = (() => {
   // ── persistence ─────────────────────────────────────────────────────────
   const scheduleSave = U.debounce(async () => { await save(); }, 550);
 
+  let saving = null;
   async function save() {
     if (!state.doc) return;
-    await window.api.writePage(state.doc);
+    const d = state.doc;
     state.dirty = false;
+    saving = window.api.writePage(d).then(() => { saving = null; });
+    await saving;
     emit('saved');
-    await refreshIndex();
+    updateIndexEntry(d);
+  }
+
+  /** Last-chance synchronous save while the window is closing. */
+  function flushSync() {
+    if (!state.doc || !state.dirty) return;
+    state.dirty = false;
+    window.api.writePageSync(state.doc);
+  }
+
+  /** Replace one document in the cached index instead of re-reading the vault. */
+  function updateIndexEntry(d) {
+    const i = state.docIndex.findIndex(x => x.id === d.id);
+    const copy = { ...d, folder: d.folder || '' };
+    if (i >= 0) state.docIndex[i] = copy; else state.docIndex.push(copy);
+    const p = state.pages.find(x => x.id === d.id);
+    const structural = !p || p.name !== d.name || (p.folder || '') !== (d.folder || '');
+    if (p) { p.name = d.name; p.updated = d.updated; p.nodeCount = d.nodes.length; p.folder = d.folder || ''; }
+    else state.pages.push({ id: d.id, name: d.name, folder: d.folder || '', updated: d.updated, nodeCount: d.nodes.length });
+    if (structural) { state.vaultRev++; emit('vault-changed'); }
+    emit('index-changed');
   }
 
   async function refreshIndex() {
@@ -115,7 +200,9 @@ App.store = (() => {
     state.pages = idx.pages;
     state.docIndex = idx.docs;
     state.folders = idx.folders;
+    state.vaultRev++;
     emit('vault-changed');
+    emit('index-changed');
   }
 
   // ── folders ─────────────────────────────────────────────────────────────
@@ -175,20 +262,28 @@ App.store = (() => {
       await window.api.writePage(d);
       await refreshIndex();
     }
-    await openPage(state.pages[0].id);
+    const last = localStorage.getItem('lastPage');
+    const open = state.pages.find(p => p.id === last) || state.pages[0];
+    await openPage(open.id);
   }
 
-  async function openPage(id) {
+  async function openPage(id, opts = {}) {
     if (state.doc && state.dirty) await save();
+    if (saving) await saving;
     const d = await window.api.readPage(id);
     if (!d) return;
-    d.nodes ||= []; d.edges ||= []; d.comments ||= [];
-    d.camera ||= { x: 0, y: 0, z: 1 };
-    d.theme ||= 'studio';
+    migrate(d);
+    try {
+      const cam = JSON.parse(localStorage.getItem(cameraKey(id)) || 'null');
+      if (cam && isFinite(cam.z) && cam.z > 0) d.camera = cam;
+    } catch (_) {}
     state.doc = d;
-    state.selection.clear();
-    state.selectedEdge = null;
+    invalidateNodes();
+    if (!opts.keepSelection) { state.selection.clear(); state.selectedEdge = null; }
+    else for (const sid of [...state.selection]) if (!nodeById(sid)) state.selection.delete(sid);
     state.undo.length = 0; state.redo.length = 0;
+    lastLabel = null;
+    try { localStorage.setItem('lastPage', id); } catch (_) {}
     emit('page-opened', d);
     emit('doc-changed', { full: true });
     emit('selection-changed');
@@ -203,8 +298,10 @@ App.store = (() => {
     return d;
   }
 
+  /** Moves the file to the vault's .trash folder. */
   async function deletePage(id) {
     await window.api.deletePage(id);
+    try { localStorage.removeItem(cameraKey(id)); } catch (_) {}
     await refreshIndex();
     if (state.doc?.id === id) {
       if (state.pages.length) await openPage(state.pages[0].id);
@@ -212,10 +309,51 @@ App.store = (() => {
     }
   }
 
-  async function renamePage(name) {
+  /** Live rename while typing in the title box: cheap, no link rewriting. */
+  function renamePage(name) {
     if (!state.doc) return;
     state.doc.name = name || 'Untitled';
+    touch();
+  }
+
+  /** Called when the title box is left: make the rename undoable and rewrite
+   *  every [[Old name]] in the vault to the new one. Returns pages touched. */
+  async function commitRename(oldName, newName) {
+    if (!state.doc) return 0;
+    const from = String(oldName || '').trim(), to = String(newName || '').trim() || 'Untitled';
+    state.doc.name = to;
+    if (!from || from === to) { commit(); return 0; }
+    state.doc.name = from;
+    beginChange('rename');
+    state.doc.name = to;
     commit();
+    await save();
+
+    const re = new RegExp(`\\[\\[\\s*${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*(\\||\\]\\])`, 'gi');
+    const rewrite = (text) => String(text).replace(re, (_m, tail) => `[[${to}${tail}`);
+    let touched = 0;
+    for (const d of state.docIndex) {
+      if (d.id === state.doc.id) continue;
+      let changed = false;
+      for (const n of (d.nodes || [])) {
+        if (!re.test(nodeText(n))) continue;
+        re.lastIndex = 0;
+        for (const k of ['title', 'body', 'text', 'label']) {
+          if (typeof n[k] === 'string' && n[k].includes('[[')) { const v = rewrite(n[k]); if (v !== n[k]) { n[k] = v; changed = true; } }
+        }
+        if (n.items) for (const it of n.items) { const v = rewrite(it.text || ''); if (v !== it.text) { it.text = v; changed = true; } }
+        if (n.cols) { const c = n.cols.map(rewrite); if (c.join('|') !== n.cols.join('|')) { n.cols = c; changed = true; } }
+        if (n.rows) for (const r of n.rows) for (let i = 0; i < r.length; i++) { const v = rewrite(r[i] || ''); if (v !== r[i]) { r[i] = v; changed = true; } }
+        if (n.type === 'embed' && norm(n.pageName) === norm(from)) { n.pageName = to; changed = true; }
+      }
+      if (changed) {
+        d.updated = Date.now();
+        await window.api.writePage(d);
+        touched++;
+      }
+    }
+    if (touched) await refreshIndex();
+    return touched;
   }
 
   // ── wikilinks ───────────────────────────────────────────────────────────
@@ -269,6 +407,15 @@ App.store = (() => {
   function embedRevision(id) {
     const d = docById(id);
     return d ? d.updated || 0 : 0;
+  }
+
+  /** Vault-relative image paths every page still uses — for asset cleanup. */
+  function referencedAssets() {
+    const out = new Set();
+    for (const d of indexDocs()) for (const n of (d.nodes || [])) {
+      if (n.type === 'image' && n.src) out.add(String(n.src).split('/').pop());
+    }
+    return [...out];
   }
 
   // ── tags ────────────────────────────────────────────────────────────────
@@ -390,7 +537,7 @@ App.store = (() => {
     state.pen.color = App.palette.ink[0];
     applyTheme();
     for (const n of state.doc.nodes) {
-      const el = document.querySelector(`[data-id="${n.id}"]`);
+      const el = App.nodes.elOf(n.id);
       if (el) el._key = null;
     }
     commit({ full: true });
@@ -433,17 +580,41 @@ App.store = (() => {
     emit('selection-changed');
   }
 
+  /** Copies the blocks, the arrows between them, and the comments on them. */
   function duplicateSelected() {
     const sel = selectedNodes();
     if (!sel.length) return;
     beginChange('duplicate');
+    const idMap = new Map();
     const fresh = [];
     for (const n of sel) {
       const c = structuredClone(n);
       c.id = U.uid(n.type);
+      idMap.set(n.id, c.id);
       c.x += 26; c.y += 26; c.z = topZ() + 1;
       state.doc.nodes.push(c);
       fresh.push(c.id);
+    }
+    for (const e of [...state.doc.edges]) {
+      const fromIn = e.from && idMap.has(e.from), toIn = e.to && idMap.has(e.to);
+      if (!fromIn && !toIn) continue;
+      if ((e.from && !fromIn) || (e.to && !toIn)) continue;   // one end outside: leave it
+      const c = structuredClone(e);
+      c.id = U.uid('e');
+      if (c.from) c.from = idMap.get(c.from);
+      if (c.to) c.to = idMap.get(c.to);
+      if (c.fromPt) { c.fromPt.x += 26; c.fromPt.y += 26; }
+      if (c.toPt) { c.toPt.x += 26; c.toPt.y += 26; }
+      state.doc.edges.push(c);
+    }
+    for (const cm of [...state.doc.comments]) {
+      if (!cm.nodeId || !idMap.has(cm.nodeId)) continue;
+      const c = structuredClone(cm);
+      c.id = U.uid('c');
+      c.nodeId = idMap.get(cm.nodeId);
+      c.x += 26; c.y += 26;
+      c.messages = c.messages.map(m => ({ ...m, id: U.uid('m') }));
+      state.doc.comments.push(c);
     }
     commit({ full: true });
     select(fresh);
@@ -472,6 +643,38 @@ App.store = (() => {
       label: '', style: 'curve', heads: 'end', color: null,
     });
     commit({ full: true });
+  }
+
+  // ── changes made outside the app ────────────────────────────────────────
+  /** A sync client or Finder touched the vault. Re-read the index; if the open
+   *  page changed on disk and we have no unsaved edits, reload it in place.
+   *  If we do have unsaved edits, keep ours as a conflict copy and take the
+   *  incoming version — nothing is lost either way. */
+  async function onExternalChange({ ids = [] } = {}) {
+    const openId = state.doc && state.doc.id;
+    const openChanged = openId && ids.includes(openId);
+    if (openChanged && (state.dirty || saving)) {
+      if (saving) await saving;
+      const mine = state.doc;
+      const theirs = await window.api.readPage(openId);
+      if (theirs && JSON.stringify(theirs.nodes) !== JSON.stringify(mine.nodes)) {
+        await window.api.writeConflict(mine);
+        state.dirty = false;
+        await refreshIndex();
+        await openPage(openId, { keepSelection: true });
+        App.app.toast('This page changed elsewhere — your version was kept as a conflict copy');
+        return;
+      }
+      state.dirty = false;
+    }
+    await refreshIndex();
+    if (openChanged) {
+      await openPage(openId, { keepSelection: true });
+      App.app.toast('Reloaded — this page changed outside the app');
+    } else if (openId && !state.pages.some(p => p.id === openId)) {
+      App.app.toast('This page was removed outside the app');
+      if (state.pages.length) await openPage(state.pages[0].id);
+    }
   }
 
   // A first-run page so the app never opens empty and unexplained.
@@ -526,19 +729,20 @@ App.store = (() => {
         ['Obsidian', 'local files, [[links]], backlinks, graph'],
       ],
     }));
-    d.edges.push({ id: U.uid('e'), from: d.nodes[1].id, to: d.nodes[2].id, label: '', arrow: true });
+    d.edges.push({ id: U.uid('e'), from: d.nodes[1].id, to: d.nodes[2].id, fromPt: null, toPt: null,
+                   label: '', style: 'curve', heads: 'end', color: null });
     return d;
   }
 
   return {
     state, on, emit, init, doc, nodeById, selectedNodes, topZ,
-    beginChange, commit, touch, undo, redo: redoAction, save,
-    openPage, newPage, deletePage, renamePage, refreshIndex,
+    beginChange, commit, touch, saveCamera, undo, redo: redoAction, save, flushSync,
+    openPage, newPage, deletePage, renamePage, commitRename, refreshIndex, onExternalChange,
     newFolder, renameFolder, deleteFolder, movePage, toggleFolder,
     pageExists, pageByName, backlinksFor, searchAll, nodeText, nodeLabel,
-    docById, embedRevision, indexDocs, tagsIn, docTags, allTags, pagesWithTag, unlinkedMentions,
+    docById, embedRevision, indexDocs, referencedAssets, tagsIn, docTags, allTags, pagesWithTag, unlinkedMentions,
     select, toggleSelect, clearSelection, setTool, setTheme, applyTheme,
     addNode, deleteSelected, duplicateSelected, bringToFront, sendToBack, addEdge,
-    blankDoc,
+    blankDoc, migrate,
   };
 })();
