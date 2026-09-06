@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: file:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+  <title>CanvasLide</title>
+  <link rel="stylesheet" href="css/app.css" />
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Sidebar: the vault ──────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div class="drag-strip"></div>
+    <div class="side-head">
+      <div class="vault-name">Vault</div>
+      <div style="display:flex;gap:2px">
+        <button class="icon-btn" id="btn-new-folder" title="New folder"><svg class="ico-folder" viewBox="0 0 48 48" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M 8.5 8 C 6.0324991 8 4 10.032499 4 12.5 L 4 35.5 C 4 37.967501 6.0324991 40 8.5 40 L 39.5 40 C 41.967501 40 44 37.967501 44 35.5 L 44 17.5 C 44 15.032499 41.967501 13 39.5 13 L 24.042969 13 L 19.572266 9.2753906 C 18.584055 8.4521105 17.339162 8 16.052734 8 L 8.5 8 z M 8.5 11 L 16.052734 11 C 16.638307 11 17.202555 11.205358 17.652344 11.580078 L 21.15625 14.5 L 17.652344 17.419922 C 17.202555 17.794642 16.638307 18 16.052734 18 L 7 18 L 7 12.5 C 7 11.653501 7.6535009 11 8.5 11 z M 24.042969 16 L 39.5 16 C 40.346499 16 41 16.653501 41 17.5 L 41 35.5 C 41 36.346499 40.346499 37 39.5 37 L 8.5 37 C 7.6535009 37 7 36.346499 7 35.5 L 7 21 L 16.052734 21 C 17.339162 21 18.584055 20.547889 19.572266 19.724609 L 24.042969 16 z"/></svg></button>
+        <button class="icon-btn" id="btn-new-page" title="New page (⌘N)">+</button>
+      </div>
+    </div>
+    <input id="page-search" class="side-search" placeholder="Search pages & content…" />
+    <div id="page-list" class="page-list"></div>
+    <div class="side-foot">
+      <div class="side-tabs">
+        <button class="side-tab active" data-tab="links">Links</button>
+        <button class="side-tab" data-tab="tags">Tags</button>
+      </div>
+      <div id="backlinks" class="backlinks"></div>
+      <div id="tagpane" class="backlinks hidden"></div>
+      <button class="ghost-btn" id="btn-reveal">Open vault folder</button>
+    </div>
+  </aside>
+
+  <!-- ── Stage: the canvas ───────────────────────────────────────────── -->
+  <main id="stage">
+    <header id="topbar">
+      <div class="topbar-left">
+        <button class="icon-btn" id="btn-toggle-side" title="Toggle sidebar (⌘\)">☰</button>
+        <input id="page-title" class="page-title" placeholder="Untitled canvas" spellcheck="false" />
+      </div>
+      <div class="topbar-right">
+        <span id="save-state" class="save-state">saved</span>
+        <button class="chip" id="btn-theme" title="Studio ⇄ Drafting look">Studio</button>
+        <button class="chip" id="btn-units" title="Document units & scale">px</button>
+        <button class="chip" id="btn-sheet" title="Sheet: paper, grid, line weight, label size">Sheet</button>
+        <button class="chip" id="btn-graph" title="Graph view (⌘G)">Graph</button>
+        <button class="chip" id="btn-outline" title="Outline (⌘⇧O)">Outline</button>
+        <button class="chip" id="btn-fit" title="Zoom to fit (⇧1)">Fit</button>
+        <span class="chip zoom" id="zoom-label">100%</span>
+      </div>
+    </header>
+
+    <div id="viewport">
+      <div id="world">
+        <svg id="edges" class="edge-layer"></svg>
+        <div id="layer-nodes"></div>
+        <div id="layer-pins"></div>
+      </div>
+      <svg id="overlay" class="overlay-layer"></svg>
+      <div id="empty-hint" class="empty-hint">
+        <b>Empty canvas.</b>
+        Double-click to write · press <kbd>/</kbd> to insert anything ·
+        <kbd>⌘⇧P</kbd> for every command
+      </div>
+    </div>
+
+    <!-- Floating tool dock -->
+    <div id="toolbar">
+      <button class="tool" data-tool="select" title="Select — V"><span class="ti">↖</span></button>
+      <button class="tool" data-tool="hand"   title="Pan — H"><span class="ti">✋</span></button>
+      <div class="tool-sep"></div>
+      <button class="tool" data-tool="note"   title="Note (markdown) — T"><span class="ti">📄</span></button>
+      <button class="tool" data-tool="sticky" title="Sticky note — S"><span class="ti">🟨</span></button>
+      <button class="tool" data-tool="todo"   title="Checklist — K"><span class="ti">☑</span></button>
+      <button class="tool" data-tool="shape"  title="Shape — R"><span class="ti">▭</span></button>
+      <button class="tool" data-tool="table"  title="Table — B"><span class="ti">▦</span></button>
+      <button class="tool" data-tool="group"  title="Section / frame — F"><span class="ti">⬚</span></button>
+      <button class="tool" data-tool="dim"    title="Dimension — M"><span class="ti">📐</span></button>
+      <button class="tool" data-tool="pen"    title="Draw — D"><span class="ti">✏️</span></button>
+      <button class="tool" data-tool="eraser" title="Erase ink — E"><span class="ti">🩹</span></button>
+      <button class="tool" data-tool="connect" title="Arrow / connector — A"><span class="ti">↗</span></button>
+      <button class="tool" data-tool="comment" title="Comment — C"><span class="ti">💬</span></button>
+    </div>
+
+    <!-- Contextual inspector for the current selection -->
+    <div id="inspector" class="inspector hidden"></div>
+
+    <div id="minimap" class="minimap">
+      <svg id="minimap-svg" width="190" height="130"></svg>
+    </div>
+
+    <aside id="outline" class="outline hidden">
+      <div class="outline-head">
+        <span>Outline</span>
+        <button class="icon-btn" id="outline-close">×</button>
+      </div>
+      <div id="outline-list" class="outline-list"></div>
+    </aside>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="pen-options" class="pen-options hidden"></div>
+    <div id="cad-options" class="pen-options hidden"></div>
+    <div id="arrow-options" class="pen-options hidden"></div>
+  </main>
+</div>
+
+<!-- Command palette / quick switcher -->
+<div id="palette" class="switcher hidden">
+  <div class="switcher-box">
+    <input id="palette-input" placeholder="Type a command, or a page name to jump to it…" />
+    <div id="palette-results"></div>
+  </div>
+</div>
+
+<!-- [[ ]] link autocomplete -->
+<div id="suggest" class="suggest hidden"></div>
+<div id="slashmenu" class="suggest hidden"></div>
+<div id="prompt" class="switcher hidden"></div>
+<div id="units-pop" class="units-pop hidden"></div>
+<div id="sheet-pop" class="units-pop hidden"></div>
+
+<!-- Graph view -->
+<div id="graph" class="graph hidden">
+  <div class="graph-box">
+    <div class="graph-head">
+      <span id="graph-hint" class="graph-hint"></span>
+      <div style="display:flex;gap:6px">
+        <button class="btn-sm" id="graph-local">Whole vault</button>
+        <button class="btn-sm" id="graph-close">Close</button>
+      </div>
+    </div>
+    <svg id="graph-svg" class="graph-svg"></svg>
+  </div>
+</div>
+
+<!-- Comment thread popover -->
+<div id="thread" class="thread hidden"></div>
+
+<script src="js/util.js"></script>
+<script src="js/markdown.js"></script>
+<script src="js/store.js"></script>
+<script src="js/cad.js"></script>
+<script src="js/arrows.js"></script>
+<script src="js/nodes.js"></script>
+<script src="js/commands.js"></script>
+<script src="js/arrange.js"></script>
+<script src="js/linking.js"></script>
+<script src="js/jsoncanvas.js"></script>
+<script src="js/export.js"></script>
+<script src="js/canvas.js"></script>
+<script src="js/comments.js"></script>
+<script src="js/sidebar.js"></script>
+<script src="js/inspector.js"></script>
+<script src="js/graph.js"></script>
+<script src="js/panels.js"></script>
+<script src="js/sheet.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,549 @@
+<title>CanvasLide Review Sheet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f4f4f0;
+    --sheet: #fdfdfb;
+    --ink: #171921;
+    --ink-2: #3a3d47;
+    --muted: #6a6e7a;
+    --line: #d5d7dc;
+    --line-soft: #e6e7ea;
+    --grid: #e9eae6;
+    --accent: #1c58c0;
+    --accent-soft: rgba(28, 88, 192, 0.10);
+    --crit: #b03a2e;  --crit-soft: rgba(176, 58, 46, 0.10);
+    --high: #9a5a0f;  --high-soft: rgba(154, 90, 15, 0.12);
+    --med:  #6a5a1a;  --med-soft: rgba(154, 130, 30, 0.14);
+    --low:  #1a7f4b;  --low-soft: rgba(26, 127, 75, 0.11);
+    --display: "Barlow Semi Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+    --body: "IBM Plex Sans", -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: "IBM Plex Mono", "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #16161a; --sheet: #1c1c21; --ink: #e8e8ee; --ink-2: #c4c4cc; --muted: #9a9aa8;
+      --line: #34343e; --line-soft: #2a2a32; --grid: #202026;
+      --accent: #a99bff; --accent-soft: rgba(124, 108, 255, 0.16);
+      --crit: #ff8a7c; --crit-soft: rgba(255, 122, 106, 0.14);
+      --high: #f2b45c; --high-soft: rgba(242, 180, 92, 0.14);
+      --med: #d9c86a; --med-soft: rgba(217, 200, 106, 0.14);
+      --low: #6fd9a8; --low-soft: rgba(78, 201, 160, 0.14);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #16161a; --sheet: #1c1c21; --ink: #e8e8ee; --ink-2: #c4c4cc; --muted: #9a9aa8;
+    --line: #34343e; --line-soft: #2a2a32; --grid: #202026;
+    --accent: #a99bff; --accent-soft: rgba(124, 108, 255, 0.16);
+    --crit: #ff8a7c; --crit-soft: rgba(255, 122, 106, 0.14);
+    --high: #f2b45c; --high-soft: rgba(242, 180, 92, 0.14);
+    --med: #d9c86a; --med-soft: rgba(217, 200, 106, 0.14);
+    --low: #6fd9a8; --low-soft: rgba(78, 201, 160, 0.14);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: var(--body); font-size: 15px; line-height: 1.55;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+  .sheet {
+    max-width: 960px; margin: 32px auto 64px; background: var(--sheet);
+    border: 1px solid var(--line); padding: 0 0 40px;
+  }
+  @media (max-width: 1000px) { .sheet { margin: 0; border-left: 0; border-right: 0; } }
+
+  /* ── title block ── */
+  .tb { display: grid; grid-template-columns: 2.2fr 1fr 1fr 1fr; border-bottom: 1px solid var(--line); }
+  .tb > div { padding: 12px 18px 14px; border-right: 1px solid var(--line); min-width: 0; }
+  .tb > div:last-child { border-right: 0; }
+  .tb .main { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid var(--line); padding: 22px 24px 18px; }
+  .tb-key { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+  .tb-val { display: block; font-family: var(--mono); font-size: 12.5px; line-height: 1.4; color: var(--ink-2); overflow-wrap: anywhere; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1.02; margin: 0 0 8px; letter-spacing: .005em; text-wrap: balance; }
+  .lede { max-width: 66ch; margin: 0; color: var(--ink-2); font-size: 15.5px; }
+  @media (max-width: 720px) { .tb { grid-template-columns: 1fr 1fr; } .tb > div:nth-child(3) { border-right: 0; } }
+
+  /* ── summary strip ── */
+  .strip { display: grid; grid-template-columns: repeat(4, 1fr); border-bottom: 1px solid var(--line); }
+  .strip > div { padding: 14px 18px; border-right: 1px solid var(--line-soft); }
+  .strip > div:last-child { border-right: 0; }
+  .strip .n { font-family: var(--display); font-size: 34px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums; }
+  .strip .l { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+  .strip .crit .n { color: var(--crit); } .strip .high .n { color: var(--high); } .strip .med .n { color: var(--med); } .strip .low .n { color: var(--low); }
+  @media (max-width: 720px) { .strip { grid-template-columns: 1fr 1fr; } .strip > div { border-bottom: 1px solid var(--line-soft); } }
+
+  /* ── body ── */
+  .content { padding: 8px 24px 0; }
+  .content p { max-width: 68ch; }
+  h2 {
+    font-family: var(--display); font-weight: 600; font-size: 24px; letter-spacing: .01em;
+    margin: 40px 0 6px; padding-top: 18px; border-top: 1px solid var(--line);
+    display: flex; align-items: baseline; gap: 12px; text-wrap: balance;
+  }
+  h2 .code { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: .1em; font-weight: 400; }
+  .sec-note { color: var(--muted); max-width: 68ch; margin: 0 0 18px; font-size: 14px; }
+
+  .finding { display: grid; grid-template-columns: 64px 1fr; gap: 0 16px; padding: 16px 0; border-top: 1px solid var(--line-soft); }
+  .finding:first-of-type { border-top: 0; }
+  .tag { font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--accent); padding-top: 3px; }
+  .head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-bottom: 6px; }
+  .head h3 { font-family: var(--display); font-weight: 600; font-size: 19px; margin: 0; line-height: 1.2; letter-spacing: .005em; }
+  .chip { font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 3px; white-space: nowrap; }
+  .chip.crit { color: var(--crit); background: var(--crit-soft); }
+  .chip.high { color: var(--high); background: var(--high-soft); }
+  .chip.med  { color: var(--med);  background: var(--med-soft); }
+  .chip.low  { color: var(--low);  background: var(--low-soft); }
+  .chip.seen { color: var(--accent); background: var(--accent-soft); }
+  .chip.code { color: var(--muted); background: var(--line-soft); }
+  .finding p { margin: 0 0 6px; max-width: 70ch; color: var(--ink-2); }
+  .finding p b { color: var(--ink); font-weight: 600; }
+  .fix { margin-top: 6px; padding-left: 12px; border-left: 2px solid var(--accent); }
+  .where { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 8px; word-break: break-word; }
+  code { font-family: var(--mono); font-size: .9em; background: var(--line-soft); padding: 1px 5px; border-radius: 3px; }
+  pre { font-family: var(--mono); font-size: 12.5px; line-height: 1.5; background: var(--ground); border: 1px solid var(--line-soft); padding: 10px 12px; overflow-x: auto; max-width: 70ch; margin: 8px 0; }
+  pre code { background: none; padding: 0; }
+  @media (max-width: 600px) { .finding { grid-template-columns: 1fr; } .tag { padding-top: 0; } }
+
+  table.meas { border-collapse: collapse; font-size: 13.5px; margin: 8px 0 4px; max-width: 70ch; }
+  table.meas th, table.meas td { text-align: left; padding: 6px 14px 6px 0; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  table.meas th { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+  table.meas td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .wrap { overflow-x: auto; }
+
+  ol.order { max-width: 70ch; padding-left: 22px; }
+  ol.order li { margin: 6px 0; color: var(--ink-2); }
+  ol.order li b { color: var(--ink); font-weight: 600; }
+  .foot { margin: 40px 24px 0; padding-top: 14px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 24px; }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="sheet">
+  <div class="tb">
+    <div class="main">
+      <h1>CanvasLide review sheet</h1>
+      <p class="lede">A pass over every file in the Electron app, then a run against a copy of the vault with the debugger attached. Findings are tagged by area, rated by how much they hurt, and marked <em>confirmed</em> where the running app reproduced them.</p>
+    </div>
+    <div><span class="tb-key">Project</span><span class="tb-val">CanvasLide 0.1.0 · Electron 44.0.0</span></div>
+    <div><span class="tb-key">Drawing</span><span class="tb-val">Code review + runtime check</span></div>
+    <div><span class="tb-key">Date</span><span class="tb-val">2026-09-06</span></div>
+    <div><span class="tb-key">Scope</span><span class="tb-val">8,075 lines · 24 files</span></div>
+  </div>
+
+  <div class="strip">
+    <div class="crit"><div class="n">6</div><div class="l">Critical · data or security</div></div>
+    <div class="high"><div class="n">8</div><div class="l">High · visible today</div></div>
+    <div class="med"><div class="n">10</div><div class="l">Medium · improvements</div></div>
+    <div class="low"><div class="n">12</div><div class="l">Low · cleanups</div></div>
+  </div>
+
+  <div class="content">
+    <p>The good news first: the architecture is sound and pleasant to work in. One command registry behind three surfaces, patch-in-place rendering that never interrupts typing, the pinned-or-loose arrow model, and driving dimensions are all well built. Nothing below needs a rewrite. The confirmed bugs are mostly one-line or one-function fixes; the critical items are about what happens to files when the app is quit, synced, or moved.</p>
+
+    <h2>Confirmed in the running app <span class="code">B</span></h2>
+    <p class="sec-note">Reproduced with the devtools protocol against a temporary copy of your five pages. The measurements below come from your 268-node drafting page.</p>
+
+    <div class="finding">
+      <div class="tag">B-01</div>
+      <div>
+        <div class="head"><h3>Command palette input is unstyled and the list runs off the window</h3><span class="chip high">High</span><span class="chip seen">Confirmed</span></div>
+        <p>The stylesheet targets <code>#switcher-input</code> and <code>#switcher-results</code>, but the HTML gives them <code>id="palette-input"</code> and <code>id="palette-results"</code>. The palette opens with a 153px white default input, black text, an inset border, and a results list with no height limit or scrollbar. With 50 commands it extends past the bottom of the window.</p>
+        <p class="fix"><b>Fix:</b> rename the two CSS selectors. Ten seconds, and the palette is the feature the README leads with.</p>
+        <div class="where">renderer/css/app.css:383, :388 · renderer/index.html:112</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-02</div>
+      <div>
+        <div class="head"><h3>Inspector sliders cannot be dragged</h3><span class="chip high">High</span><span class="chip seen">Confirmed</span></div>
+        <p>Every slider <code>input</code> event commits, <code>commit</code> emits <code>doc-changed</code>, and the inspector rebuilds its whole panel from that event. The slider under the pointer is destroyed on its own first tick. In the test, the element was gone from the document immediately after one input event. Text size, stroke width, dimension thickness and arrow thickness all move one step and then stop.</p>
+        <p class="fix"><b>Fix:</b> skip the inspector re-render when the change came from the inspector itself (a flag on the commit options), or update only the value labels in place during a drag. Coalescing the undo entries from the same drag belongs in the same change; see B-05.</p>
+        <div class="where">renderer/js/inspector.js:405 (doc-changed → render) · :311 and the other range inputs</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-03</div>
+      <div>
+        <div class="head"><h3>Finished tasks in a note gain an extra <code>~~</code> every time the note is edited</h3><span class="chip high">High</span><span class="chip seen">Confirmed</span></div>
+        <p>A done task renders as <code>&lt;li&gt;☑&lt;s&gt;text&lt;/s&gt;&lt;/li&gt;</code>. When you click into the body and leave, the DOM is converted back to markdown and <code>&lt;s&gt;</code> becomes <code>~~text~~</code>, so <code>- [x] task two</code> comes back as <code>- [x] ~~task two~~</code>. The next edit wraps it again. This is silent, cumulative corruption of note content.</p>
+        <p class="fix"><b>Fix:</b> in <code>toMarkdown</code>, skip the strike wrapper when the element is the direct child of a checked task <code>li</code>, or render done tasks with a CSS class instead of a real <code>&lt;s&gt;</code>.</p>
+        <div class="where">renderer/js/markdown.js:26 (toMarkdown) · :166 (render)</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-04</div>
+      <div>
+        <div class="head"><h3>Wikilinks to pages with <code>&amp;</code>, <code>&lt;</code>, <code>&gt;</code> or <code>"</code> in the name never resolve</h3><span class="chip med">Medium</span><span class="chip seen">Confirmed</span></div>
+        <p><code>inline()</code> escapes the whole string first, then matches <code>[[…]]</code> on the escaped text and escapes the name again. <code>[[Tom &amp; Jerry]]</code> renders as <code>Tom &amp;amp;amp; Jerry</code>, is looked up as the escaped string, and is styled as a missing page.</p>
+        <p class="fix"><b>Fix:</b> match wikilinks and tags on the raw text and escape each piece as it is emitted, or unescape the captured name before the lookup.</p>
+        <div class="where">renderer/js/markdown.js:92–98</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-05</div>
+      <div>
+        <div class="head"><h3>Undo history fills with no-op and per-keystroke snapshots</h3><span class="chip high">High</span><span class="chip seen">Confirmed</span></div>
+        <p>Each <code>beginChange</code> stringifies the whole document (66 KB on the drafting page). Three things push snapshots far too often: focusing any text field pushes one before anything is typed, each arrow-key nudge pushes one, and each slider tick pushes one. Tabbing through a table then pressing ⌘Z appears to do nothing several times in a row.</p>
+        <div class="wrap"><table class="meas">
+          <tr><th>Action</th><th>Undo entries</th><th>Memory</th></tr>
+          <tr><td>Click into a field, type nothing</td><td class="num">1</td><td class="num">66 KB</td></tr>
+          <tr><td>Hold → for 20 nudges</td><td class="num">20</td><td class="num">1.3 MB</td></tr>
+          <tr><td>One slider drag (if B-02 were fixed)</td><td class="num">≈ 1 per pixel</td><td class="num">66 KB each</td></tr>
+        </table></div>
+        <p class="fix"><b>Fix:</b> push the snapshot on the first real <code>input</code> event rather than on <code>focusin</code>, and coalesce consecutive changes with the same label within about 400 ms (nudge, slider, thickness) into one entry.</p>
+        <div class="where">renderer/js/store.js:56–71 · renderer/js/app.js:130, :404</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-06</div>
+      <div>
+        <div class="head"><h3>Panning or zooming rewrites the page file and re-indexes the vault</h3><span class="chip high">High</span><span class="chip seen">Confirmed</span></div>
+        <p>Every wheel tick calls <code>store.touch()</code>, which schedules a save. The test scrolled three ticks and the file's modification time and size changed. Each save then re-reads and parses every page in the vault and ships all of them over IPC. For an iCloud vault this means every scroll uploads the page and every other Mac downloads it. With hundreds of pages the re-index becomes the slowest thing in the app.</p>
+        <div class="wrap"><table class="meas">
+          <tr><th>Measured (5 pages)</th><th>Time</th><th>Grows with</th></tr>
+          <tr><td>Write one page</td><td class="num">3.2 ms</td><td>page size</td></tr>
+          <tr><td>Re-index whole vault</td><td class="num">2.9 ms · 85 KB over IPC</td><td>vault size, every save</td></tr>
+        </table></div>
+        <p class="fix"><b>Fix:</b> keep the camera per page in <code>localStorage</code> or the settings file instead of in the document, so viewing never dirties it. Make the index incremental: after a save, replace only that document in <code>docIndex</code>; do a full re-walk only on folder operations, vault change, or a file watcher event (D-03).</p>
+        <div class="where">renderer/js/canvas.js:395, :415, :425, :1103 · renderer/js/store.js:85, :110 · main.js:152</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-07</div>
+      <div>
+        <div class="head"><h3>PNG export captures the toolbar, minimap and inspector, and leaves the view changed</h3><span class="chip med">Medium</span><span class="chip seen">Confirmed</span></div>
+        <p><code>exportPng</code> zooms to fit and captures the viewport rectangle, but never adds the <code>exporting</code> class the PDF path uses. The floating dock, minimap and zoom chip all sit inside that rectangle. The camera is not restored afterwards, so exporting also moves you.</p>
+        <p class="fix"><b>Fix:</b> wrap the capture in the existing <code>withCleanCanvas</code> helper in export.js, which already hides chrome and restores camera and selection.</p>
+        <div class="where">renderer/js/app.js:602 · renderer/js/export.js (withCleanCanvas)</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">B-08</div>
+      <div>
+        <div class="head"><h3>Renderer errors never reach the terminal</h3><span class="chip med">Medium</span><span class="chip seen">Confirmed</span></div>
+        <p>The <code>console-message</code> listener uses the old positional signature. Since Electron 32 it receives one details object whose <code>level</code> is the string <code>'error'</code>, so <code>level &gt;= 2</code> is always false and the handler logs nothing. The comment says this is what makes iterating less blind; right now it is blind.</p>
+        <p class="fix"><b>Fix:</b></p>
+        <pre><code>win.webContents.on('console-message', (ev) => {
+  if (ev.level === 'error' || ev.level === 'warning')
+    console.error(`[renderer] ${ev.message}  (${ev.sourceId}:${ev.lineNumber})`);
+});</code></pre>
+        <div class="where">main.js:369 · node_modules/electron/electron.d.ts WebContentsConsoleMessageEventParams</div>
+      </div>
+    </div>
+
+    <h2>Security <span class="code">S</span></h2>
+
+    <div class="finding">
+      <div class="tag">S-01</div>
+      <div>
+        <div class="head"><h3>Links open arbitrary websites inside the app, and a plain link navigates the app away</h3><span class="chip crit">Critical</span><span class="chip seen">Confirmed</span></div>
+        <p>Markdown links render as <code>&lt;a target="_blank"&gt;</code>. There is no <code>setWindowOpenHandler</code>, so the click spawns a new Electron window showing the remote site (verified: <code>window.open('https://example.com')</code> produced a second window). The preload bridge was not inherited by that window, so the vault API did not leak, but the site runs in an unsandboxed app window with the app's session. There is also no <code>will-navigate</code> guard, so any link without a target replaces the app with the destination page. Comment text goes through the same renderer.</p>
+        <p class="fix"><b>Fix:</b> in <code>createWindow</code>:</p>
+        <pre><code>win.webContents.setWindowOpenHandler(({ url }) => {
+  if (/^https?:\/\//i.test(url)) shell.openExternal(url);
+  return { action: 'deny' };
+});
+win.webContents.on('will-navigate', (e) => e.preventDefault());</code></pre>
+        <p>And in the renderer's click handler, route <code>a[href]</code> through <code>window.api.openExternal</code> so the anchor never navigates.</p>
+        <div class="where">main.js:349 · renderer/js/markdown.js:105 · renderer/js/app.js click handler</div>
+      </div>
+    </div>
+
+    <h2>Data safety <span class="code">D</span></h2>
+    <p class="sec-note">The README's promise is "plain files you own, synced by iCloud or Dropbox". These are the gaps between that promise and what the file layer does.</p>
+
+    <div class="finding">
+      <div class="tag">D-01</div>
+      <div>
+        <div class="head"><h3>Page writes are not atomic</h3><span class="chip crit">Critical</span><span class="chip code">From code</span></div>
+        <p><code>page:write</code> writes straight over the existing file. A crash, a kill, or a power cut during the write leaves a truncated JSON file, and <code>readIndex</code> then silently skips it, so the page vanishes from the sidebar.</p>
+        <p class="fix"><b>Fix:</b> write to <code>&lt;file&gt;.tmp</code> in the same directory, then <code>fs.rename</code> over the original. Keep the previous version as <code>.bak</code> if you want belt and braces.</p>
+        <div class="where">main.js:224</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">D-02</div>
+      <div>
+        <div class="head"><h3>Quitting soon after typing can drop the last edits</h3><span class="chip crit">Critical</span><span class="chip code">From code</span></div>
+        <p>Saves are debounced by 550 ms. On close, <code>beforeunload</code> fires <code>store.save()</code> but cannot wait for it; the renderer tears down and the main process may exit before the async write lands. Type a sentence, press ⌘Q, and the sentence may not be on disk.</p>
+        <p class="fix"><b>Fix:</b> handle <code>before-quit</code> and window <code>close</code> in main: prevent the default, ask the renderer for the dirty document over IPC, write it synchronously, then quit. Or expose a <code>sendSync</code> flush in the preload used only from <code>beforeunload</code>.</p>
+        <div class="where">renderer/js/app.js:645 · renderer/js/store.js:103 · main.js app lifecycle</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">D-03</div>
+      <div>
+        <div class="head"><h3>Changes made outside the app are never seen, and get overwritten</h3><span class="chip crit">Critical</span><span class="chip code">From code</span></div>
+        <p>Nothing watches the vault. If iCloud brings in an edit from another Mac while a page is open here, the next autosave writes this Mac's stale copy over it. New pages synced in do not appear until something triggers a save. This is the exact scenario the README advertises.</p>
+        <p class="fix"><b>Fix:</b> <code>fs.watch</code> the vault recursively (macOS supports it natively) with a short debounce. On a change to a file that is not the open page, refresh that entry in the index. On a change to the open page with no local edits, reload it. On a change to the open page with local edits, write the local copy as <code>Name (conflict YYYY-MM-DD).canvaslide.json</code> and toast, the way Obsidian and Syncthing do.</p>
+        <div class="where">main.js (no watcher) · renderer/js/store.js refreshIndex</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">D-04</div>
+      <div>
+        <div class="head"><h3>Images are stored as absolute paths</h3><span class="chip crit">Critical</span><span class="chip code">From code</span></div>
+        <p>A pasted image is saved into <code>assets/</code> correctly, but the node stores <code>file:///Users/leo/Documents/CanvasLide/assets/…</code>. Open the same vault on a Mac with a different username, move the vault folder, or use "Change Vault Folder" after moving files, and every image is broken. The JSON Canvas exporter already strips the prefix, which shows the intent.</p>
+        <p class="fix"><b>Fix:</b> store <code>assets/x.png</code> in the document and resolve to a URL at render time in <code>nodes.inner</code>. Migrate on load: if <code>src</code> starts with <code>file://</code>, keep the part after <code>/assets/</code>.</p>
+        <div class="where">renderer/js/app.js:465 · renderer/js/nodes.js image case · renderer/js/jsoncanvas.js</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">D-05</div>
+      <div>
+        <div class="head"><h3>Deleting a page unlinks the file permanently</h3><span class="chip crit">Critical</span><span class="chip code">From code</span></div>
+        <p>The confirm dialog is the only protection. A slip on the small <code>×</code> that appears on hover over every page row is unrecoverable.</p>
+        <p class="fix"><b>Fix:</b> move the file to <code>.trash/</code> inside the vault instead. The vault walker already ignores dot-folders, so nothing else changes. Add "Empty trash" to the palette.</p>
+        <div class="where">main.js:240 · renderer/js/sidebar.js pageRow</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">D-06</div>
+      <div>
+        <div class="head"><h3>Documents carry no schema version</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>Nodes already exist in several shapes (the seed edge uses <code>arrow: true</code>, newer ones use <code>heads</code>). Without a <code>version</code> field there is no clean place to run migrations such as D-04.</p>
+        <p class="fix"><b>Fix:</b> add <code>version: 1</code> to <code>blankDoc</code> and a small <code>migrate(doc)</code> in <code>openPage</code>.</p>
+        <div class="where">renderer/js/store.js blankDoc, openPage</div>
+      </div>
+    </div>
+
+    <h2>Keyboard and menu <span class="code">K</span></h2>
+    <p class="sec-note">These could not be reproduced by script because macOS blocks synthetic keystrokes without accessibility permission. Typing <code>!</code> in any note will show whether K-01 is real on your machine.</p>
+
+    <div class="finding">
+      <div class="tag">K-01</div>
+      <div>
+        <div class="head"><h3>Typing <code>!</code> or <code>@</code> in a text field zooms the canvas</h3><span class="chip high">High</span><span class="chip code">From code</span></div>
+        <p>The View menu binds Zoom to Fit and Zoom to Selection to <code>Shift+1</code> and <code>Shift+2</code>. On macOS, application-menu key equivalents are handled before the web page sees the key, so those shortcuts fire even while a note has focus. On a US layout those chords are <code>!</code> and <code>@</code>. The renderer already handles ⇧1 and ⇧2 itself, correctly guarded by <code>isTyping()</code>, so the menu accelerators are redundant.</p>
+        <p class="fix"><b>Fix:</b> drop the <code>accelerator</code> from those two menu items and leave the renderer's handler in charge. Show the shortcut in the label text if you want it visible in the menu.</p>
+        <div class="where">main.js:419–420 · renderer/js/app.js wireKeys</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">K-02</div>
+      <div>
+        <div class="head"><h3>⌘Z while typing performs document undo instead of text undo</h3><span class="chip high">High</span><span class="chip code">From code</span></div>
+        <p>Edit → Undo and Redo are custom items that call <code>store.undo()</code>. The renderer deliberately leaves ⌘Z alone while typing so the browser's native text undo works, but the menu takes the keystroke first. The result: the whole document snapshot is restored underneath a field you are still editing, and the next keystroke writes the field's DOM text back over it.</p>
+        <p class="fix"><b>Fix:</b> use <code>{ role: 'undo' }</code> and <code>{ role: 'redo' }</code> in the menu, and in the renderer intercept ⌘Z on <code>window</code> only when not typing (already the case). Native undo then reaches the focused field, and canvas undo keeps working when nothing has focus.</p>
+        <div class="where">main.js:405–406 · renderer/js/app.js wireKeys</div>
+      </div>
+    </div>
+
+    <h2>Performance and structure <span class="code">P</span></h2>
+    <p class="sec-note">Measured on the 268-node, 112-arrow drafting page: a full render took 3.8 ms and a drag repaint 1.9 ms. Nothing here hurts today; these are the places that will scale badly.</p>
+
+    <div class="finding">
+      <div class="tag">P-01</div>
+      <div>
+        <div class="head"><h3>Node lookups by <code>querySelector</code> inside loops</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p><code>render</code>, <code>paintOnly</code> and a dozen call sites find a node's element with an attribute selector, so a repaint of n nodes is n scans of the layer. Also <code>nodeById</code> is a linear <code>find</code> called from hot paths such as arrow rendering.</p>
+        <p class="fix"><b>Fix:</b> keep a <code>Map</code> from id to element in nodes.js and a <code>Map</code> from id to node in the store, rebuilt on <code>doc-changed</code>.</p>
+        <div class="where">renderer/js/canvas.js:853 and similar · renderer/js/store.js nodeById</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">P-02</div>
+      <div>
+        <div class="head"><h3>Sidebar rebuilds on every save and re-sorts by last edit</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>Each autosave emits <code>vault-changed</code>, which sets <code>innerHTML = ''</code> on the page list, losing scroll position, and the list is sorted by <code>updated</code>, so the page you are editing jumps to the top of its folder on every edit. That makes the tree feel unstable exactly while you are using it.</p>
+        <p class="fix"><b>Fix:</b> sort alphabetically by default with an optional "recent" sort, and only re-render the sidebar when names, folders or page count change.</p>
+        <div class="where">main.js:131 · renderer/js/sidebar.js:18</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">P-03</div>
+      <div>
+        <div class="head"><h3>Graph view redraws at 60 fps forever while open</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p><code>tick</code> stops simulating when the layout settles but keeps rebuilding the SVG every frame.</p>
+        <p class="fix"><b>Fix:</b> only call <code>draw()</code> when the simulation stepped, a drag or pan happened, or hover changed.</p>
+        <div class="where">renderer/js/graph.js:151</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">P-04</div>
+      <div>
+        <div class="head"><h3>Full canvas re-render on title keystrokes and after every save</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>Renaming the page commits on every keystroke, and <code>vault-changed</code> is also wired to <code>App.canvas.render()</code>. Neither needs to repaint the nodes.</p>
+        <div class="where">renderer/js/app.js wireChrome, boot</div>
+      </div>
+    </div>
+
+    <h2>Product improvements <span class="code">U</span></h2>
+
+    <div class="finding">
+      <div class="tag">U-01</div>
+      <div>
+        <div class="head"><h3>A drawing set with mixed sheet sizes prints every sheet at the first one's size</h3><span class="chip high">High</span><span class="chip code">From code</span></div>
+        <p><code>printBoxes</code> derives the page size from the first section and scales every later section to fit it. An A3 landscape followed by an A4 portrait produces two A3 pages with the second drawing letterboxed. That contradicts the README's "a PDF whose page really is A3".</p>
+        <p class="fix"><b>Fix:</b> Chromium supports named pages. Give each <code>.pdf-page</code> its own <code>page: sheet3</code> and emit <code>@page sheet3 { size: … }</code> per section, and drop the shared <code>@page</code> rule.</p>
+        <div class="where">renderer/js/export.js:136 (printBoxes), buildPrintDoc</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-02</div>
+      <div>
+        <div class="head"><h3>The link card exists but nothing creates one</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>There is a full <code>link</code> node type with rendering and open-in-browser, reachable only through JSON Canvas import. Pasting a URL today makes a note whose title is the URL.</p>
+        <p class="fix"><b>Fix:</b> add "Link" to the insert list; when pasted text is a single URL, create a link card; on drop of <code>.md</code> or <code>.txt</code>, create a note.</p>
+        <div class="where">renderer/js/commands.js build · renderer/js/app.js wirePaste</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-03</div>
+      <div>
+        <div class="head"><h3>No right-click menu</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>Button 2 is ignored on the canvas and there is no context menu anywhere: no duplicate, delete, bring to front, colour, or "open in folder" on a page row. Every peer app has one.</p>
+        <p class="fix"><b>Fix:</b> a small in-app context menu built from the same command registry, filtered by what is under the pointer.</p>
+        <div class="where">renderer/js/canvas.js onPointerDown</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-04</div>
+      <div>
+        <div class="head"><h3>Renaming a page does not update links to it</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>Every <code>[[Old name]]</code> elsewhere in the vault becomes a missing link. Obsidian offers to rewrite them, and it is the reason people trust wikilinks. The rename is also not undoable.</p>
+        <p class="fix"><b>Fix:</b> on rename, find backlinks via the existing <code>backlinksFor</code>, rewrite the text in each node and save those pages, with a toast naming how many were updated.</p>
+        <div class="where">renderer/js/store.js:215</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-05</div>
+      <div>
+        <div class="head"><h3>Duplicate drops arrows and comments</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>Duplicating a selection copies the blocks but not the arrows between them nor comments pinned to them. Copying a wired-up cluster of shapes, the common case on a diagram page, means redrawing every connector.</p>
+        <p class="fix"><b>Fix:</b> clone edges whose both ends are in the selection, remapping ids; same for comments with a <code>nodeId</code> in the selection.</p>
+        <div class="where">renderer/js/store.js:436</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-06</div>
+      <div>
+        <div class="head"><h3>A page created from <code>[[</code> autocomplete keeps looking missing</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>The note's <code>contentKey</code> depends only on title and body, so when a linked page comes into existence the dashed "missing" styling stays until the note is edited again.</p>
+        <p class="fix"><b>Fix:</b> include a vault revision counter in <code>contentKey</code> for notes, or clear <code>_key</code> on notes containing wikilinks in the <code>vault-changed</code> handler.</p>
+        <div class="where">renderer/js/nodes.js contentKey</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-07</div>
+      <div>
+        <div class="head"><h3>Title block SCALE field shows a pixel ratio, not a drawing scale</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>It reads <code>1 px = 0.03937 in</code>. A title block conventionally says <code>1:1</code>, <code>1:50</code>, or <code>NTS</code>. The presets already exist in cad.js.</p>
+        <p class="fix"><b>Fix:</b> when <code>perPx</code> matches a preset, print the ratio; otherwise print <code>1 : perPx</code> in the page unit.</p>
+        <div class="where">renderer/js/nodes.js:267</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-08</div>
+      <div>
+        <div class="head"><h3>Comment pins print into PDFs</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p><code>buildPrintDoc</code> clones the whole world layer, pins included, and the <code>printing</code> rules do not hide them.</p>
+        <p class="fix"><b>Fix:</b> add <code>#app.printing .pin { display: none }</code>, or strip <code>#layer-pins</code> from the clone.</p>
+        <div class="where">renderer/js/export.js buildPrintDoc · renderer/css/app.css printing rules</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-09</div>
+      <div>
+        <div class="head"><h3>Sticky text ignores the text-size control</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>Stickies are the one text block with a fixed 15px size; the inspector's size slider and the sheet-wide slider skip them.</p>
+        <div class="where">renderer/css/app.css .s-text · renderer/js/inspector.js texty list</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-10</div>
+      <div>
+        <div class="head"><h3>Orphaned image files</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>Deleting an image node leaves its file in <code>assets/</code> forever. Pair with D-05: a "Clean unused assets" command that lists files no page references.</p>
+        <div class="where">main.js:245 · renderer/js/store.js deleteSelected</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">U-11</div>
+      <div>
+        <div class="head"><h3>No tests for the two pure, fragile modules</h3><span class="chip med">Medium</span><span class="chip code">From code</span></div>
+        <p>markdown.js (render + toMarkdown round trip) and jsoncanvas.js (import + export) are pure functions that run in plain Node with a tiny DOM shim, and both have already had regressions of the B-03 kind. A dozen round-trip cases would have caught B-03 and B-04.</p>
+        <p class="fix"><b>Fix:</b> <code>node --test</code> with jsdom for the markdown round trip, plus fixtures for an Obsidian-authored <code>.canvas</code> file.</p>
+      </div>
+    </div>
+
+    <h2>Cleanups <span class="code">C</span></h2>
+
+    <div class="finding">
+      <div class="tag">C-01</div>
+      <div>
+        <div class="head"><h3>The raster PDF pipeline is dead code</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>Since the switch to <code>printToPDF</code>, all of pdf.js, <code>jpegSize</code>, the <code>capture:region</code> and <code>pdf:save</code> handlers, <code>captureRegion</code> and <code>savePdf</code> in the preload, and <code>captureBox</code> in export.js are unreachable. The preload also exposes <code>readAll</code> and <code>listPages</code>, which nothing calls.</p>
+        <p class="fix"><b>Fix:</b> delete them, and keep <code>withCleanCanvas</code> for B-07. Fewer IPC entry points is also a smaller attack surface.</p>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">C-02</div>
+      <div>
+        <div class="head"><h3>Stale CSS and README</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>The <code>.handle</code>, <code>.port</code>, <code>.align-bar</code> rules and <code>#dock</code> refer to DOM that no longer exists (the overlay draws handles in SVG now). <code>node._scale</code> and <code>void prev</code> in <code>resizeTo</code> are leftovers. The README's "Not there yet" section still says PDF output rasterises and text is not selectable, which stopped being true when vector printing landed.</p>
+        <div class="where">renderer/css/app.css:274–285, :563 · renderer/js/canvas.js resizeTo · README.md:224</div>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">C-03</div>
+      <div>
+        <div class="head"><h3>Mixed icon styles</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>The comment in util.js says inline SVG icons are sharper than emoji, but only the folder icon was converted; the toolbar is still emoji run through a grayscale filter, and renders differently per macOS version.</p>
+        <p class="fix"><b>Fix:</b> a set of 14 one-colour SVG icons in <code>App.icons</code>, which would also let the active tool take the accent colour properly.</p>
+      </div>
+    </div>
+
+    <div class="finding">
+      <div class="tag">C-04</div>
+      <div>
+        <div class="head"><h3>Distribution</h3><span class="chip low">Low</span><span class="chip code">From code</span></div>
+        <p>The packaged app is unsigned and not notarised, so on another Mac it opens with the Gatekeeper warning. If it is only for you this is fine; if it goes to anyone else, <code>@electron/osx-sign</code> and <code>@electron/notarize</code> slot into the existing package script.</p>
+      </div>
+    </div>
+
+    <h2>Suggested order</h2>
+    <ol class="order">
+      <li><b>One afternoon, all confirmed:</b> B-01 palette CSS, B-08 console handler, K-01 and K-02 menu accelerators, S-01 window-open guard, B-07 PNG chrome. Five files, no design decisions.</li>
+      <li><b>Data layer:</b> D-01 atomic writes, D-02 flush on quit, D-05 trash folder, D-04 relative asset paths with migration. This is what makes "your files, your folder" true.</li>
+      <li><b>Editing feel:</b> B-03 strike round trip, B-04 escaping, B-05 undo coalescing, B-02 inspector re-render. B-02 and B-05 are one change.</li>
+      <li><b>Sync:</b> B-06 camera out of the document and incremental index, then D-03 the watcher with conflict copies. Do B-06 first or the watcher will fire on every scroll.</li>
+      <li><b>Then the product items</b>, U-01 mixed sheet sizes first since it breaks a documented promise, and U-11 tests before touching markdown.js again.</li>
+    </ol>
+  </div>
+
+  <div class="foot">
+    <span>Reviewed against a temporary copy of the vault; the real vault and settings were not modified.</span>
+    <span>Confirmed = reproduced with the devtools protocol on Electron 44.0.0.</span>
+  </div>
+</div>

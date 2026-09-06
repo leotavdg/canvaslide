@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>NSDocumentsFolderUsageDescription</key>
+  <string>CanvasLide stores your canvases as plain JSON files in a folder you own, so you can back them up or sync them yourself.</string>
+  <key>NSHumanReadableCopyright</key>
+  <string>CanvasLide</string>
+</dict>
+</plist>
